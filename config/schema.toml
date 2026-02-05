@@ -1,0 +1,13 @@
+[columns]
+id = "id"
+title = "title"
+country = "country"
+language = "language"
+license = "license"
+publisher = "publisher"
+year = "year"
+subject = "subject"
+
+[list_columns]
+language = true
+subject = true

@@ -37,3 +37,8 @@ htmlcov/
 
 # IDE / OS
 .DS_Store
+
+# Local data and env
+data/raw/
+data/metrics/metrics.json
+.env

@@ -1,7 +1,7 @@
-# DOAJ
+# DOAJ Dashboard
 
-## Python setup
-Create a virtual environment and install dev tools:
+## Setup
+Create a virtual environment and install dependencies:
 
 ```bash
 python3 -m venv .venv
@@ -9,24 +9,49 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Run tests and lint:
+## Configure API access
+Copy the template and set your API key (read-only endpoints may not require one):
 
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and update `DOAJ_API_KEY` if needed.
+
+## Build metrics cache
+Pull data from the DOAJ API:
+
+```bash
+doaj ingest --source api
+```
+
+Or ingest a CSV file (update column mapping in `config/schema.toml`):
+
+```bash
+doaj ingest --source csv --csv /path/to/file.csv
+```
+
+## Run the dashboard
+Start the API server:
+
+```bash
+doaj api --reload
+```
+
+Serve the HTML frontend in another terminal:
+
+```bash
+doaj serve
+```
+
+Open `http://localhost:8000/` in your browser.
+
+## Development checks
 ```bash
 pytest
 ruff check .
 ```
 
-Run the CLI:
-
-```bash
-doaj
-```
-
-## Run HTML locally
-1. Put HTML files in `web/`.
-2. Start the server with `./scripts/serve.sh`.
-3. Open `http://localhost:8000/` in your browser.
-
-You can pass a custom port or directory:
-- `./scripts/serve.sh 8080`
-- `./scripts/serve.sh 8000 web`
+## Notes
+- Cached metrics are stored in `data/metrics/metrics.json` (ignored by git).
+- The API uses `data/metrics/sample.json` if no cache is available.

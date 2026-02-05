@@ -9,6 +9,13 @@ description = "DOAJ project"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
+dependencies = [
+  "fastapi>=0.110",
+  "polars>=0.20",
+  "python-dotenv>=1.0",
+  "requests>=2.31",
+  "uvicorn>=0.25"
+]
 authors = [
   { name = "Ikhwan Arief", email = "ikhwanarief@gmail.com" }
 ]
