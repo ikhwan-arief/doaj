@@ -77,6 +77,15 @@ def normalize_journal_record(record: dict[str, Any]) -> dict[str, Any]:
     languages = bib.get("language") or record.get("language")
     license_value = _license_value(bib.get("license") or record.get("license"))
 
+    publisher = bib.get("publisher") or record.get("publisher")
+    publisher_name = None
+    publisher_country = None
+    if isinstance(publisher, dict):
+        publisher_name = publisher.get("name") or publisher.get("publisher")
+        publisher_country = publisher.get("country")
+    elif publisher:
+        publisher_name = str(publisher)
+
     year = _extract_year(
         record.get("created_date"),
         record.get("createdAt"),
@@ -88,10 +97,10 @@ def normalize_journal_record(record: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": record.get("id") or record.get("identifier"),
         "title": bib.get("title") or record.get("title"),
-        "country": bib.get("country") or record.get("country"),
+        "country": bib.get("country") or record.get("country") or publisher_country,
         "language": _to_list(languages),
         "license": license_value,
-        "publisher": bib.get("publisher") or record.get("publisher"),
+        "publisher": publisher_name,
         "year": year,
         "subject": subjects,
     }

@@ -8,6 +8,7 @@ import time
 import urllib.parse
 
 import requests
+from requests import HTTPError
 
 from .config import Settings
 
@@ -63,11 +64,22 @@ class DoajApiSource:
         records: list[dict[str, Any]] = []
         page = 1
         total = None
+        max_records = 1000
+        max_pages = None
 
         while True:
-            page_data = self._fetch_page(query, page)
+            try:
+                page_data = self._fetch_page(query, page)
+            except HTTPError as exc:
+                if "beyond 1000" in str(exc).lower():
+                    break
+                raise
             records.extend(page_data.records)
             total = page_data.total if page_data.total is not None else total
+            if total and max_pages is None and total > max_records:
+                max_pages = max_records // self.settings.page_size
+                if max_records % self.settings.page_size:
+                    max_pages += 1
 
             if not page_data.records:
                 break
@@ -75,6 +87,9 @@ class DoajApiSource:
             if total is not None:
                 if len(records) >= total:
                     break
+
+            if max_pages is not None and page >= max_pages:
+                break
 
             page += 1
             time.sleep(0.2)
@@ -87,4 +102,3 @@ class DoajApiSource:
             for record in records:
                 handle.write(json.dumps(record, ensure_ascii=False))
                 handle.write("\n")
-

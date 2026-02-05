@@ -49,3 +49,4 @@ ruff check .
 ## Notes
 - Cached metrics are stored in `data/metrics/metrics.json` (ignored by git).
 - The API uses `data/metrics/sample.json` if no cache is available.
+- The DOAJ public search API limits results to 1000 records; the ingest step caps to that limit.

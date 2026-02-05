@@ -69,7 +69,7 @@ def load_settings() -> Settings:
         api_key_header=os.getenv("DOAJ_API_KEY_HEADER", "Authorization"),
         api_key_prefix=os.getenv("DOAJ_API_KEY_PREFIX", "Bearer"),
         journals_endpoint=os.getenv("DOAJ_JOURNALS_ENDPOINT", "search/journals").strip("/"),
-        query=os.getenv("DOAJ_QUERY", "in_doaj:true"),
+        query=os.getenv("DOAJ_QUERY", "admin.in_doaj:true"),
         query_param=os.getenv("DOAJ_QUERY_PARAM", "q"),
         page_param=os.getenv("DOAJ_PAGE_PARAM", "page"),
         page_size_param=os.getenv("DOAJ_PAGE_SIZE_PARAM", "pageSize"),

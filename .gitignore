@@ -42,3 +42,4 @@ htmlcov/
 data/raw/
 data/metrics/metrics.json
 .env
+logs/

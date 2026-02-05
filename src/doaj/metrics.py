@@ -22,7 +22,7 @@ def _count_by(df: pl.DataFrame, column: str, top_n: int | None = None) -> list[d
     if column not in df.columns:
         return []
     series = df[column].drop_nulls()
-    counts = series.value_counts().sort("counts", descending=True)
+    counts = series.value_counts().sort("count", descending=True)
     if top_n:
         counts = counts.head(top_n)
     return [
