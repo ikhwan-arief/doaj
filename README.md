@@ -16,6 +16,12 @@ pytest
 ruff check .
 ```
 
+Run the CLI:
+
+```bash
+doaj
+```
+
 ## Run HTML locally
 1. Put HTML files in `web/`.
 2. Start the server with `./scripts/serve.sh`.

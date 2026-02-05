@@ -25,6 +25,9 @@ dev = [
   "ruff>=0.4"
 ]
 
+[project.scripts]
+doaj = "doaj.main:main"
+
 [tool.ruff]
 line-length = 100
 
