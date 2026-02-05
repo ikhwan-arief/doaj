@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-import csv
 import json
 import time
 import urllib.parse
@@ -89,12 +88,3 @@ class DoajApiSource:
                 handle.write(json.dumps(record, ensure_ascii=False))
                 handle.write("\n")
 
-
-class CsvSource:
-    def __init__(self, path: Path) -> None:
-        self.path = path
-
-    def load_rows(self) -> list[dict[str, Any]]:
-        with self.path.open("r", encoding="utf-8", newline="") as handle:
-            reader = csv.DictReader(handle)
-            return list(reader)

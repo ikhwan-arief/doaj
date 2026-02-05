@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import os
-import tomllib
 
 from dotenv import load_dotenv
 
@@ -22,7 +21,6 @@ class Settings:
     page_size: int
     query_in_path: bool
     data_dir: Path
-    schema_path: Path
     api_port: int
     cors_origins: list[str]
 
@@ -34,11 +32,6 @@ class Settings:
     def metrics_dir(self) -> Path:
         return self.data_dir / "metrics"
 
-
-@dataclass(frozen=True)
-class Schema:
-    columns: dict[str, str]
-    list_columns: dict[str, bool]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -70,38 +63,19 @@ def load_settings() -> Settings:
         data_dir = PROJECT_ROOT / data_dir
     data_dir = data_dir.resolve()
 
-    schema_path = Path(os.getenv("DOAJ_SCHEMA_PATH", "config/schema.toml"))
-    if not schema_path.is_absolute():
-        schema_path = PROJECT_ROOT / schema_path
-    schema_path = schema_path.resolve()
-
     return Settings(
         api_base=os.getenv("DOAJ_API_BASE", "https://doaj.org/api/v4").rstrip("/"),
         api_key=os.getenv("DOAJ_API_KEY") or None,
         api_key_header=os.getenv("DOAJ_API_KEY_HEADER", "Authorization"),
         api_key_prefix=os.getenv("DOAJ_API_KEY_PREFIX", "Bearer"),
         journals_endpoint=os.getenv("DOAJ_JOURNALS_ENDPOINT", "search/journals").strip("/"),
-        query=os.getenv("DOAJ_QUERY", "*:*"),
+        query=os.getenv("DOAJ_QUERY", "in_doaj:true"),
         query_param=os.getenv("DOAJ_QUERY_PARAM", "q"),
         page_param=os.getenv("DOAJ_PAGE_PARAM", "page"),
         page_size_param=os.getenv("DOAJ_PAGE_SIZE_PARAM", "pageSize"),
         page_size=_env_int("DOAJ_PAGE_SIZE", 100),
         query_in_path=_env_bool("DOAJ_QUERY_IN_PATH", False),
         data_dir=data_dir,
-        schema_path=schema_path,
         api_port=_env_int("DOAJ_API_PORT", 8001),
         cors_origins=cors_origins,
     )
-
-
-def load_schema(path: Path) -> Schema:
-    if not path.exists():
-        return Schema(columns={}, list_columns={})
-
-    with path.open("rb") as handle:
-        data = tomllib.load(handle)
-
-    columns = data.get("columns", {})
-    list_columns = data.get("list_columns", {})
-
-    return Schema(columns=columns, list_columns=list_columns)

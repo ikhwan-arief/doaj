@@ -7,9 +7,9 @@ import re
 
 import polars as pl
 
-from .config import Settings, load_schema, load_settings
+from .config import Settings, load_settings
 from .metrics import compute_metrics
-from .sources import CsvSource, DoajApiSource
+from .sources import DoajApiSource
 
 
 YEAR_RE = re.compile(r"(19|20)\d{2}")
@@ -97,25 +97,6 @@ def normalize_journal_record(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def normalize_csv_rows(rows: list[dict[str, Any]], schema_path: Path) -> list[dict[str, Any]]:
-    schema = load_schema(schema_path)
-    normalized: list[dict[str, Any]] = []
-
-    for row in rows:
-        record: dict[str, Any] = {}
-        for key, column in schema.columns.items():
-            record[key] = row.get(column)
-
-        for key, is_list in schema.list_columns.items():
-            if is_list and key in record:
-                record[key] = _to_list(record[key])
-
-        record["year"] = _extract_year(record.get("year"), record.get("created"), record.get("created_at"))
-        normalized.append(record)
-
-    return normalized
-
-
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
@@ -138,28 +119,7 @@ def ingest_from_api(settings: Settings) -> Path:
     return metrics_path
 
 
-def ingest_from_csv(settings: Settings, csv_path: Path) -> Path:
-    source = CsvSource(csv_path)
-    rows = source.load_rows()
-    normalized = normalize_csv_rows(rows, settings.schema_path)
-    df = pl.DataFrame(normalized)
-
-    metrics_payload = compute_metrics(df, source=csv_path.name)
-    metrics_path = settings.metrics_dir / "metrics.json"
-    _write_json(metrics_path, metrics_payload)
-    return metrics_path
-
-
-def ingest(source: str, csv_path: str | None = None) -> Path:
+def ingest() -> Path:
     settings = load_settings()
     settings.metrics_dir.mkdir(parents=True, exist_ok=True)
-
-    if source == "api":
-        return ingest_from_api(settings)
-
-    if source == "csv":
-        if not csv_path:
-            raise ValueError("csv_path is required when source=csv")
-        return ingest_from_csv(settings, Path(csv_path))
-
-    raise ValueError("source must be 'api' or 'csv'")
+    return ingest_from_api(settings)

@@ -18,9 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="doaj", description="DOAJ dashboard tooling")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    ingest_parser = subparsers.add_parser("ingest", help="Fetch data and build metrics cache")
-    ingest_parser.add_argument("--source", choices=["api", "csv"], default="api")
-    ingest_parser.add_argument("--csv", dest="csv_path", help="CSV path when source=csv")
+    subparsers.add_parser("ingest", help="Fetch data and build metrics cache from the DOAJ API")
 
     api_parser = subparsers.add_parser("api", help="Run the local dashboard API")
     api_parser.add_argument("--host", default="127.0.0.1")
@@ -53,7 +51,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     if args.command == "ingest":
-        metrics_path = ingest(args.source, args.csv_path)
+        metrics_path = ingest()
         print(f"Metrics written to {metrics_path}")
         return 0
 

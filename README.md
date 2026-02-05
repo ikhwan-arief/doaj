@@ -22,13 +22,7 @@ Edit `.env` and update `DOAJ_API_KEY` if needed.
 Pull data from the DOAJ API:
 
 ```bash
-doaj ingest --source api
-```
-
-Or ingest a CSV file (update column mapping in `config/schema.toml`):
-
-```bash
-doaj ingest --source csv --csv /path/to/file.csv
+doaj ingest
 ```
 
 ## Run the dashboard
