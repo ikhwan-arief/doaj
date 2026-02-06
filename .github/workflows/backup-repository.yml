@@ -1,0 +1,74 @@
+name: Backup DOAJ repository
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 2 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-doaj-repository
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Prepare backup files
+        id: prep
+        run: |
+          set -euo pipefail
+          timestamp="$(date -u +'%Y%m%d-%H%M%S')"
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          mkdir -p backup
+
+          snapshot_file="backup/${repo_name}-snapshot-${timestamp}.zip"
+          bundle_file="backup/${repo_name}-history-${timestamp}.bundle"
+          meta_file="backup/${repo_name}-backup-meta-${timestamp}.txt"
+
+          # Snapshot of tracked files at current HEAD.
+          git archive --format=zip --output="${snapshot_file}" HEAD
+
+          # Full Git history backup.
+          git bundle create "${bundle_file}" --all
+          git bundle verify "${bundle_file}" >/dev/null
+
+          {
+            echo "Repository: ${GITHUB_REPOSITORY}"
+            echo "Run ID: ${GITHUB_RUN_ID}"
+            echo "Created at (UTC): $(date -u +'%Y-%m-%d %H:%M:%S')"
+            echo "Commit: ${GITHUB_SHA}"
+            echo "Snapshot: $(basename "${snapshot_file}")"
+            echo "History bundle: $(basename "${bundle_file}")"
+          } > "${meta_file}"
+
+          echo "timestamp=${timestamp}" >> "${GITHUB_OUTPUT}"
+          echo "snapshot_file=${snapshot_file}" >> "${GITHUB_OUTPUT}"
+          echo "bundle_file=${bundle_file}" >> "${GITHUB_OUTPUT}"
+          echo "meta_file=${meta_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload snapshot zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-${{ steps.prep.outputs.timestamp }}
+          path: ${{ steps.prep.outputs.snapshot_file }}
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload history bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: history-bundle-${{ steps.prep.outputs.timestamp }}
+          path: |
+            ${{ steps.prep.outputs.bundle_file }}
+            ${{ steps.prep.outputs.meta_file }}
+          retention-days: 90
+          if-no-files-found: error
