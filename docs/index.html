@@ -126,6 +126,22 @@
       font-size: 14px;
     }
     .status-banner.hidden { display: none; }
+    .year-range-wrap { display: flex; flex-direction: column; gap: 8px; }
+    .year-range-values {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    input[type="range"] {
+      width: 100%;
+      padding: 0;
+      height: 24px;
+      background: transparent;
+      border: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
     footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 0 30px; }
   </style>
 </head>
@@ -179,16 +195,12 @@
         <label for="preservation">Preservation</label>
         <select id="preservation">
           <option value="">All</option>
-          <option value="yes">Yes</option>
-          <option value="no">No</option>
         </select>
       </div>
       <div class="filter-group">
         <label for="pid">PID Scheme</label>
         <select id="pid">
           <option value="">All</option>
-          <option value="yes">Yes</option>
-          <option value="no">No</option>
         </select>
       </div>
       <div class="filter-group">
@@ -200,12 +212,15 @@
         <input id="subject" type="text" placeholder="contains…" />
       </div>
       <div class="filter-group">
-        <label for="year-from">Created Year (from)</label>
-        <input id="year-from" type="number" min="1900" max="2100" placeholder="e.g., 2015" />
-      </div>
-      <div class="filter-group">
-        <label for="year-to">Created Year (to)</label>
-        <input id="year-to" type="number" min="1900" max="2100" placeholder="e.g., 2026" />
+        <label for="year-from">Created Year (horizontal range)</label>
+        <div class="year-range-wrap">
+          <input id="year-from" type="range" min="1900" max="2100" value="1900" />
+          <input id="year-to" type="range" min="1900" max="2100" value="2100" />
+          <div class="year-range-values">
+            <span id="year-from-label">1900</span>
+            <span id="year-to-label">2100</span>
+          </div>
+        </div>
       </div>
       <button id="reset">Reset Filters</button>
     </div>
@@ -248,7 +263,8 @@
       records: [],
       filtered: [],
       aggregates: {},
-      meta: {}
+      meta: {},
+      yearBounds: null
     };
     const countryNameFormatter = (typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined')
       ? new Intl.DisplayNames([navigator.language || 'en', 'en'], { type: 'region' })
@@ -273,6 +289,28 @@
       if (!iso) return "–";
       const d = new Date(iso);
       return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function toValueList(value) {
+      if (value === null || value === undefined) return [];
+      if (Array.isArray(value)) return value.flatMap(toValueList).filter(Boolean);
+      if (typeof value === 'object') {
+        for (const key of ['scheme', 'service', 'name', 'term', 'type', 'id']) {
+          if (typeof value[key] === 'string' && value[key].trim()) return [value[key].trim()];
+        }
+        return [];
+      }
+      const text = String(value).trim();
+      if (!text) return [];
+      return text.split(/[|;]+/).map(part => part.trim()).filter(Boolean);
+    }
+
+    function formatPidScheme(value) {
+      if (!value) return '—';
+      const raw = String(value).trim();
+      if (!raw) return '—';
+      if (/^[a-z0-9_-]+$/i.test(raw)) return raw.toUpperCase();
+      return raw;
     }
 
     function titleCase(value) {
@@ -303,6 +341,69 @@
       if (!text) return '—';
       const value = String(text);
       return value.length <= maxLen ? value : `${value.slice(0, maxLen - 3)}...`;
+    }
+
+    function getCreatedYear(record) {
+      if (!record || !record.created_date) return null;
+      const year = new Date(record.created_date).getUTCFullYear();
+      return Number.isNaN(year) ? null : year;
+    }
+
+    function syncYearLabels() {
+      const fromEl = document.getElementById('year-from');
+      const toEl = document.getElementById('year-to');
+      document.getElementById('year-from-label').textContent = fromEl.value || '—';
+      document.getElementById('year-to-label').textContent = toEl.value || '—';
+    }
+
+    function setupYearRange() {
+      const fromEl = document.getElementById('year-from');
+      const toEl = document.getElementById('year-to');
+      const years = state.records.map(getCreatedYear).filter(y => y !== null);
+
+      if (!years.length) {
+        state.yearBounds = null;
+        fromEl.disabled = true;
+        toEl.disabled = true;
+        fromEl.value = '';
+        toEl.value = '';
+        syncYearLabels();
+        return;
+      }
+
+      const min = Math.min(...years);
+      const max = Math.max(...years);
+      state.yearBounds = { min, max };
+
+      fromEl.disabled = false;
+      toEl.disabled = false;
+      fromEl.min = String(min);
+      fromEl.max = String(max);
+      toEl.min = String(min);
+      toEl.max = String(max);
+
+      if (!fromEl.value || Number.isNaN(parseInt(fromEl.value, 10))) fromEl.value = String(min);
+      if (!toEl.value || Number.isNaN(parseInt(toEl.value, 10))) toEl.value = String(max);
+      if (parseInt(fromEl.value, 10) < min) fromEl.value = String(min);
+      if (parseInt(fromEl.value, 10) > max) fromEl.value = String(max);
+      if (parseInt(toEl.value, 10) < min) toEl.value = String(min);
+      if (parseInt(toEl.value, 10) > max) toEl.value = String(max);
+      if (parseInt(fromEl.value, 10) > parseInt(toEl.value, 10)) fromEl.value = toEl.value;
+
+      syncYearLabels();
+    }
+
+    function resetYearRange() {
+      const fromEl = document.getElementById('year-from');
+      const toEl = document.getElementById('year-to');
+      if (!state.yearBounds) {
+        fromEl.value = '';
+        toEl.value = '';
+      } else {
+        fromEl.value = String(state.yearBounds.min);
+        toEl.value = String(state.yearBounds.max);
+      }
+      syncYearLabels();
     }
 
     async function loadJsonOrNull(path) {
@@ -349,6 +450,10 @@
       const countries = Array.from(new Set(state.records.map(r => r.country).filter(Boolean)))
         .sort((a, b) => formatCountry(a).localeCompare(formatCountry(b)));
       const licenses = Array.from(new Set(state.records.map(r => r.license_type).filter(Boolean))).sort();
+      const preservations = Array.from(new Set(state.records.flatMap(r => toValueList(r.preservation_service))))
+        .sort((a, b) => String(a).localeCompare(String(b)));
+      const pidSchemes = Array.from(new Set(state.records.flatMap(r => toValueList(r.pid_scheme))))
+        .sort((a, b) => String(a).localeCompare(String(b)));
 
       const countrySelect = document.getElementById('country');
       countrySelect.length = 1;
@@ -363,6 +468,26 @@
       licenses.forEach(c => {
         const opt = document.createElement('option'); opt.value = c; opt.textContent = c; licenseSelect.appendChild(opt);
       });
+
+      const preservationSelect = document.getElementById('preservation');
+      preservationSelect.length = 1;
+      preservations.forEach(service => {
+        const opt = document.createElement('option');
+        opt.value = service;
+        opt.textContent = service;
+        preservationSelect.appendChild(opt);
+      });
+
+      const pidSelect = document.getElementById('pid');
+      pidSelect.length = 1;
+      pidSchemes.forEach(scheme => {
+        const opt = document.createElement('option');
+        opt.value = scheme;
+        opt.textContent = formatPidScheme(scheme);
+        pidSelect.appendChild(opt);
+      });
+
+      setupYearRange();
     }
 
     function applyFilters() {
@@ -384,20 +509,16 @@
         if (apc === 'no' && r.apc_has !== false) return false;
         if (author === 'yes' && r.author_retains !== true) return false;
         if (author === 'no' && r.author_retains !== false) return false;
-        if (preservation === 'yes' && r.preservation_has !== true) return false;
-        if (preservation === 'no' && r.preservation_has !== false) return false;
-        if (pid === 'yes' && r.pid_has !== true) return false;
-        if (pid === 'no' && r.pid_has !== false) return false;
+        if (preservation && !toValueList(r.preservation_service).includes(preservation)) return false;
+        if (pid && !toValueList(r.pid_scheme).includes(pid)) return false;
         if (publisher && !(r.publisher || '').toLowerCase().includes(publisher)) return false;
         if (subject && !(r.subject_terms || []).some(s => s.toLowerCase().includes(subject))) return false;
-        if (!Number.isNaN(yearFrom) || !Number.isNaN(yearTo)) {
-          const dt = r.created_date ? new Date(r.created_date) : null;
-          if (dt) {
-            const y = dt.getUTCFullYear();
-            if (!Number.isNaN(yearFrom) && y < yearFrom) return false;
-            if (!Number.isNaN(yearTo) && y > yearTo) return false;
-          } else {
-            return false;
+        if (state.yearBounds && !Number.isNaN(yearFrom) && !Number.isNaN(yearTo)) {
+          const usesYearNarrowing = yearFrom > state.yearBounds.min || yearTo < state.yearBounds.max;
+          if (usesYearNarrowing) {
+            const y = getCreatedYear(r);
+            if (y === null) return false;
+            if (y < yearFrom || y > yearTo) return false;
           }
         }
         return true;
@@ -406,7 +527,9 @@
     }
 
     function resetFilters() {
-      document.querySelectorAll('.filters select, .filters input').forEach(el => el.value = '');
+      document.querySelectorAll('.filters select').forEach(el => el.value = '');
+      document.querySelectorAll('.filters input[type="text"]').forEach(el => el.value = '');
+      resetYearRange();
       state.filtered = state.records;
       renderAll();
     }
@@ -548,6 +671,8 @@
         return;
       }
       for (const r of rows) {
+        const preservationText = toValueList(r.preservation_service).join(', ') || '—';
+        const pidText = toValueList(r.pid_scheme).map(formatPidScheme).join(', ') || '—';
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${r.title || '—'}</td>
@@ -555,8 +680,8 @@
           <td>${formatCountry(r.country)}</td>
           <td>${r.license_type || '—'}</td>
           <td>${r.apc_has === true ? '<span class="pill">Yes</span>' : r.apc_has === false ? '<span class="pill negative">No</span>' : '—'}</td>
-          <td>${r.preservation_has === true ? '<span class=\"pill\">Yes</span>' : r.preservation_has === false ? '<span class=\"pill negative\">No</span>' : '—'}</td>
-          <td>${r.pid_has === true ? '<span class=\"pill\">Yes</span>' : r.pid_has === false ? '<span class=\"pill negative\">No</span>' : '—'}</td>
+          <td>${preservationText}</td>
+          <td>${pidText}</td>
           <td>${formatDate(r.created_date)}</td>
         `;
         tbody.appendChild(tr);
@@ -570,9 +695,25 @@
     }
 
     function wireEvents() {
-      document.querySelectorAll('.filters select, .filters input').forEach(el => {
+      document.querySelectorAll('.filters select, .filters input[type="text"]').forEach(el => {
         el.addEventListener('change', applyFilters);
         el.addEventListener('keyup', ev => { if (ev.key === 'Enter') applyFilters(); });
+      });
+      const fromEl = document.getElementById('year-from');
+      const toEl = document.getElementById('year-to');
+      fromEl.addEventListener('input', () => {
+        if (parseInt(fromEl.value, 10) > parseInt(toEl.value, 10)) {
+          toEl.value = fromEl.value;
+        }
+        syncYearLabels();
+        applyFilters();
+      });
+      toEl.addEventListener('input', () => {
+        if (parseInt(toEl.value, 10) < parseInt(fromEl.value, 10)) {
+          fromEl.value = toEl.value;
+        }
+        syncYearLabels();
+        applyFilters();
       });
       document.getElementById('reset').addEventListener('click', resetFilters);
     }
