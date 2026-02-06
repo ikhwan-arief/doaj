@@ -396,6 +396,22 @@ def parse_float(value: Optional[str]) -> Optional[float]:
         return None
 
 
+def parse_int(value: Optional[str]) -> Optional[int]:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    cleaned = cleaned.replace(",", "")
+    match = re.search(r"-?\d+", cleaned)
+    if not match:
+        return None
+    try:
+        return int(match.group(0))
+    except ValueError:
+        return None
+
+
 def parse_date(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
@@ -468,6 +484,7 @@ def get_value(row: Dict[str, str], lookup: Dict[str, str], candidates: Sequence[
 
 def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Dict[str, Any]:
     title = get_value(row, lookup, ["title", "journaltitle", "journal title"])
+    doaj_url = get_value(row, lookup, ["urlindoaj", "url in doaj"]) or get_value(row, lookup, ["journalurl", "journal url"])
     publisher = get_value(row, lookup, ["publisher", "publishername"])
     country = get_value(row, lookup, ["country", "countryofpublisher", "journalcountry"])
     license_type = split_multi(get_value(row, lookup, ["license", "journallicense", "licensetype", "license terms"]))
@@ -542,12 +559,14 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
     issn_online = get_value(row, lookup, ["onlineissn", "eissn", "issnonline"])
     fallback_id = get_value(row, lookup, ["id", "journalid", "doajid", "identifier"])
     record_id = fallback_id or issn_online or issn_print or f"row-{index}"
+    article_records = parse_int(get_value(row, lookup, ["numberofarticlerecords", "articlecount", "numberofarticles"]))
 
     license_flags = parse_license_flags(license_type)
 
     return {
         "id": record_id,
         "title": title,
+        "doaj_url": doaj_url,
         "publisher": publisher,
         "country": country,
         "pissn": issn_print,
@@ -572,6 +591,7 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
         "peer_review_type": peer_review_type,
         "deposit_policy_directory": deposit_policy_directory,
         "keywords": keywords,
+        "article_records": article_records,
         "oa_start": get_value(row, lookup, ["oastart", "openaccessstart"]),
         "created_date": created_date,
         "last_updated": last_updated,

@@ -87,11 +87,11 @@
       font-weight: 700;
       letter-spacing: 0.02em;
     }
-    .charts {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 14px;
-      padding: 0 28px;
+    .charts { display: grid; gap: 14px; padding: 0 28px; }
+    .chart-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .chart-row.single { grid-template-columns: 1fr; }
+    @media (max-width: 1200px) {
+      .chart-row { grid-template-columns: 1fr; }
     }
     .chart-box {
       background: var(--card);
@@ -99,12 +99,9 @@
       border-radius: 14px;
       padding: 10px;
       box-shadow: var(--shadow);
-      min-height: 280px;
+      min-height: 320px;
     }
-    .chart-box.stack {
-      grid-column: 1 / -1;
-      min-height: 360px;
-    }
+    .chart-box.map-box { min-height: 500px; }
     .table-box {
       margin: 18px 28px 40px;
       background: var(--card);
@@ -115,10 +112,13 @@
       overflow-x: auto;
     }
     table { width: 100%; border-collapse: collapse; font-family: 'Source Sans Pro', system-ui, -apple-system, sans-serif; }
-    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
     th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
     .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; background: rgba(71,161,120,0.18); color: #2F6E52; }
     .pill.negative { background: rgba(253,90,59,0.18); color: #8F311C; }
+    .pill.warn { background: rgba(152,46,10,0.18); color: #982E0A; margin-left: 6px; }
+    .table-link { color: #982E0A; text-decoration: none; font-weight: 600; }
+    .table-link:hover { text-decoration: underline; }
     .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; background: #22c55e; }
     .status-banner {
       margin: 0 28px 14px;
@@ -161,11 +161,11 @@
   <div id="status-banner" class="status-banner hidden"></div>
 
   <div class="card-grid" id="kpi-cards">
-    <div class="card"><div class="label">Total Journals</div><div class="value" id="kpi-total">–</div></div>
-    <div class="card"><div class="label">Last Updated</div><div class="value" id="kpi-updated">–</div></div>
-    <div class="card"><div class="label">APC (Yes)</div><div class="value" id="kpi-apc">–</div></div>
-    <div class="card"><div class="label">Preservation (Yes)</div><div class="value" id="kpi-pres">–</div></div>
-    <div class="card"><div class="label">PID Scheme (Yes)</div><div class="value" id="kpi-pid">–</div></div>
+    <div class="card"><div class="label">Journals</div><div class="value" id="kpi-journals">–</div></div>
+    <div class="card"><div class="label">Country</div><div class="value" id="kpi-countries">–</div></div>
+    <div class="card"><div class="label">Articles</div><div class="value" id="kpi-articles">–</div></div>
+    <div class="card"><div class="label">Languages</div><div class="value" id="kpi-languages">–</div></div>
+    <div class="card"><div class="label">No APC</div><div class="value" id="kpi-no-apc">–</div></div>
   </div>
 
   <div class="layout">
@@ -174,6 +174,10 @@
       <div class="filter-group">
         <label for="country">Country</label>
         <select id="country"><option value="">All</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="subject-filter">Subjects</label>
+        <select id="subject-filter"><option value="">All</option></select>
       </div>
       <div class="filter-group">
         <label for="license">License Type</label>
@@ -230,10 +234,6 @@
         <input id="publisher" type="text" placeholder="contains…" />
       </div>
       <div class="filter-group">
-        <label for="subject">Subject (text)</label>
-        <input id="subject" type="text" placeholder="contains…" />
-      </div>
-      <div class="filter-group">
         <label for="year-from">Created Year (horizontal range)</label>
         <div class="year-range-wrap">
           <input id="year-from" type="range" min="1900" max="2100" value="1900" />
@@ -248,11 +248,25 @@
     </div>
 
     <div class="charts">
-      <div class="chart-box stack" id="chart-country"></div>
-      <div class="chart-box stack" id="chart-subjects"></div>
-      <div class="chart-box" id="chart-license"></div>
-      <div class="chart-box" id="chart-apc"></div>
-      <div class="chart-box" id="chart-timeline"></div>
+      <div class="chart-row">
+        <div class="chart-box" id="chart-country"></div>
+        <div class="chart-box" id="chart-subjects"></div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-box" id="chart-license"></div>
+        <div class="chart-box" id="chart-peer-review"></div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-box" id="chart-pid"></div>
+        <div class="chart-box" id="chart-languages"></div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-box" id="chart-publishers"></div>
+        <div class="chart-box" id="chart-timeline"></div>
+      </div>
+      <div class="chart-row single">
+        <div class="chart-box map-box" id="chart-country-map"></div>
+      </div>
     </div>
   </div>
 
@@ -264,14 +278,13 @@
     <table>
       <thead>
         <tr>
-          <th>Title</th>
-          <th>Publisher</th>
-          <th>Country</th>
-          <th>License</th>
+          <th>Journal title</th>
+          <th>Country of publisher</th>
+          <th>Subject</th>
           <th>APC</th>
-          <th>Preservation</th>
-          <th>PID</th>
-          <th>Created</th>
+          <th>Article records</th>
+          <th>Date of inclusion</th>
+          <th>Last updated</th>
         </tr>
       </thead>
       <tbody id="table-body"></tbody>
@@ -628,6 +641,97 @@
       return Number.isNaN(year) ? null : year;
     }
 
+    function getArticleRecords(record) {
+      if (!record) return null;
+      const raw = record.article_records;
+      if (raw === null || raw === undefined || raw === '') return null;
+      const num = Number(raw);
+      if (Number.isFinite(num)) return Math.trunc(num);
+      const match = String(raw).replace(/,/g, '').match(/-?\d+/);
+      return match ? Number(match[0]) : null;
+    }
+
+    function isOverOneMonth(record) {
+      if (!record || !record.created_date) return false;
+      const created = new Date(record.created_date);
+      if (Number.isNaN(created.getTime())) return false;
+      return Date.now() - created.getTime() > (30 * 24 * 60 * 60 * 1000);
+    }
+
+    function sumArticleRecords(records) {
+      return records.reduce((sum, r) => {
+        const value = getArticleRecords(r);
+        return sum + (value === null ? 0 : value);
+      }, 0);
+    }
+
+    function sortedEntries(counterObj, limit) {
+      const entries = Object.entries(counterObj).sort((a, b) => b[1] - a[1]);
+      return typeof limit === 'number' ? entries.slice(0, limit) : entries;
+    }
+
+    function countTermFrequency(records, termExtractor, includeNotAvailable = false) {
+      const counts = {};
+      for (const record of records) {
+        const terms = [...new Set((termExtractor(record) || []).filter(Boolean))];
+        if (!terms.length) {
+          if (includeNotAvailable) {
+            counts[NOT_AVAILABLE] = (counts[NOT_AVAILABLE] || 0) + 1;
+          }
+          continue;
+        }
+        for (const term of terms) {
+          counts[term] = (counts[term] || 0) + 1;
+        }
+      }
+      return counts;
+    }
+
+    function renderHorizontalBarChart(targetId, title, entries, opts = {}) {
+      if (!entries.length) {
+        Plotly.newPlot(
+          targetId,
+          [],
+          {
+            title,
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#282624' },
+            xaxis: { visible: false },
+            yaxis: { visible: false },
+            annotations: [{ text: 'No data yet', showarrow: false, xref: 'paper', yref: 'paper', x: 0.5, y: 0.5 }]
+          },
+          { displayModeBar: false }
+        );
+        return;
+      }
+
+      const labelFormatter = opts.labelFormatter || (v => v);
+      const labels = entries.map(d => labelFormatter(d[0]));
+      const values = entries.map(d => d[1]);
+      const colors = opts.colors || labels.map(() => (opts.color || '#3A5959'));
+
+      Plotly.newPlot(
+        targetId,
+        [{
+          type: 'bar',
+          orientation: 'h',
+          x: values.slice().reverse(),
+          y: labels.slice().reverse(),
+          marker: { color: colors.slice().reverse() }
+        }],
+        {
+          title,
+          margin: { l: opts.leftMargin || 280, r: 12, t: 46, b: 48 },
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#282624' },
+          yaxis: { automargin: true }
+        },
+        { displayModeBar: false }
+      );
+    }
+
     function syncYearLabels() {
       const fromEl = document.getElementById('year-from');
       const toEl = document.getElementById('year-to');
@@ -707,7 +811,7 @@
         state.filtered = [];
         state.aggregates = aggRes || {};
         state.meta = metaRes || {};
-        setStatus('Data is not available yet. Trigger the \"Fetch DOAJ journals (hourly)\" GitHub Action, then refresh this page.');
+        setStatus('Data is not available yet. Trigger the "Fetch DOAJ journals (hourly)" GitHub Action, then refresh this page.');
         renderAll();
         return;
       }
@@ -716,11 +820,7 @@
       state.filtered = journalsRes;
       state.aggregates = aggRes || {};
       state.meta = metaRes || {};
-      if (state.meta.is_capped) {
-        setStatus(`Showing ${state.meta.fetched_total || journalsRes.length} of ${state.meta.source_total || journalsRes.length} journals due to source result-window limits (${state.meta.result_cap || 1000} records per query).`);
-      } else {
-        setStatus('');
-      }
+      setStatus('');
       populateFilters();
       renderAll();
     }
@@ -728,6 +828,8 @@
     function populateFilters() {
       const countries = Array.from(new Set(state.records.map(r => r.country).filter(Boolean)))
         .sort((a, b) => formatCountry(a).localeCompare(formatCountry(b)));
+      const subjects = Array.from(new Set(state.records.flatMap(r => toValueList(r.subject_terms))))
+        .sort((a, b) => String(a).localeCompare(String(b)));
       const licenses = Array.from(new Set(state.records.flatMap(r => toValueList(r.license_type))))
         .sort((a, b) => String(a).localeCompare(String(b)));
       const peerReviews = Array.from(new Set(state.records.flatMap(r => getPeerReviewTerms(r.peer_review_type))))
@@ -743,16 +845,29 @@
 
       const countrySelect = document.getElementById('country');
       countrySelect.length = 1;
-      countries.forEach(c => {
+      countries.forEach(country => {
         const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = formatCountry(c);
+        opt.value = country;
+        opt.textContent = formatCountry(country);
         countrySelect.appendChild(opt);
       });
+
+      const subjectSelect = document.getElementById('subject-filter');
+      subjectSelect.length = 1;
+      subjects.forEach(subject => {
+        const opt = document.createElement('option');
+        opt.value = subject;
+        opt.textContent = subject;
+        subjectSelect.appendChild(opt);
+      });
+
       const licenseSelect = document.getElementById('license');
       licenseSelect.length = 1;
-      licenses.forEach(c => {
-        const opt = document.createElement('option'); opt.value = c; opt.textContent = c; licenseSelect.appendChild(opt);
+      licenses.forEach(license => {
+        const opt = document.createElement('option');
+        opt.value = license;
+        opt.textContent = license;
+        licenseSelect.appendChild(opt);
       });
 
       const peerReviewSelect = document.getElementById('peer-review');
@@ -805,6 +920,7 @@
 
     function applyFilters() {
       const country = document.getElementById('country').value;
+      const subjectFilter = document.getElementById('subject-filter').value;
       const license = document.getElementById('license').value;
       const apc = document.getElementById('apc').value;
       const author = document.getElementById('author-retains').value;
@@ -814,12 +930,12 @@
       const pid = document.getElementById('pid').value;
       const language = document.getElementById('language').value;
       const publisher = document.getElementById('publisher').value.trim().toLowerCase();
-      const subject = document.getElementById('subject').value.trim().toLowerCase();
       const yearFrom = parseInt(document.getElementById('year-from').value, 10);
       const yearTo = parseInt(document.getElementById('year-to').value, 10);
 
       state.filtered = state.records.filter(r => {
         if (country && r.country !== country) return false;
+        if (subjectFilter && !toValueList(r.subject_terms).includes(subjectFilter)) return false;
         if (license && !toValueList(r.license_type).includes(license)) return false;
         if (apc === 'yes' && r.apc_has !== true) return false;
         if (apc === 'no' && r.apc_has !== false) return false;
@@ -831,7 +947,6 @@
         if (pid && !getPidSchemes(r.pid_scheme).includes(pid)) return false;
         if (language && !getSimpleTerms(r.language).includes(language)) return false;
         if (publisher && !(r.publisher || '').toLowerCase().includes(publisher)) return false;
-        if (subject && !(r.subject_terms || []).some(s => s.toLowerCase().includes(subject))) return false;
         if (state.yearBounds && !Number.isNaN(yearFrom) && !Number.isNaN(yearTo)) {
           const usesYearNarrowing = yearFrom > state.yearBounds.min || yearTo < state.yearBounds.max;
           if (usesYearNarrowing) {
@@ -846,22 +961,24 @@
     }
 
     function resetFilters() {
-      document.querySelectorAll('.filters select').forEach(el => el.value = '');
-      document.querySelectorAll('.filters input[type="text"]').forEach(el => el.value = '');
+      document.querySelectorAll('.filters select').forEach(el => { el.value = ''; });
+      document.querySelectorAll('.filters input[type="text"]').forEach(el => { el.value = ''; });
       resetYearRange();
       state.filtered = state.records;
       renderAll();
     }
 
     function renderKPIs() {
-      document.getElementById('kpi-total').textContent = formatNumber(state.filtered.length);
-      document.getElementById('kpi-updated').textContent = formatDate(state.meta.source_last_updated_max || state.meta.fetched_at);
-      const apcYes = state.filtered.filter(r => r.apc_has === true).length;
-      document.getElementById('kpi-apc').textContent = formatNumber(apcYes);
-      const presYes = state.filtered.filter(r => r.preservation_has === true).length;
-      document.getElementById('kpi-pres').textContent = formatNumber(presYes);
-      const pidYes = state.filtered.filter(r => r.pid_has === true).length;
-      document.getElementById('kpi-pid').textContent = formatNumber(pidYes);
+      const countries = new Set(state.filtered.map(r => r.country).filter(Boolean));
+      const languages = new Set(state.filtered.flatMap(r => getSimpleTerms(r.language)));
+      const noApc = state.filtered.filter(r => r.apc_has === false).length;
+
+      document.getElementById('kpi-journals').textContent = formatNumber(state.filtered.length);
+      document.getElementById('kpi-countries').textContent = formatNumber(countries.size);
+      document.getElementById('kpi-articles').textContent = formatNumber(sumArticleRecords(state.filtered));
+      document.getElementById('kpi-languages').textContent = formatNumber(languages.size);
+      document.getElementById('kpi-no-apc').textContent = formatNumber(noApc);
+
       const metaText = `Fetched: ${formatDate(state.meta.fetched_at)} | Source last updated: ${formatDate(state.meta.source_last_updated_max)}`;
       document.getElementById('meta-info').textContent = metaText;
     }
@@ -872,172 +989,222 @@
         return;
       }
 
-      // Country bar (top 12)
       const countryCounts = {};
-      for (const r of state.filtered) if (r.country) countryCounts[r.country] = (countryCounts[r.country] || 0) + 1;
-      const topCountries = Object.entries(countryCounts).sort((a,b) => b[1]-a[1]).slice(0,12);
-      const countryLabels = topCountries.map(d => formatCountry(d[0]));
-      const countryValues = topCountries.map(d => d[1]);
+      for (const record of state.filtered) {
+        if (record.country) countryCounts[record.country] = (countryCounts[record.country] || 0) + 1;
+      }
+      const topCountries = sortedEntries(countryCounts, 10).map(([country, count]) => [formatCountry(country), count]);
+      renderHorizontalBarChart('chart-country', 'Top 10 countries', topCountries, { leftMargin: 260, color: '#3A5959' });
+
+      const subjectCounts = countTermFrequency(state.filtered, r => toValueList(r.subject_terms));
+      const topSubjects = sortedEntries(subjectCounts, 10).map(([term, count]) => [shortLabel(term, 60), count]);
+      renderHorizontalBarChart('chart-subjects', 'Top 10 subjects', topSubjects, { leftMargin: 320, color: '#FA9A87' });
+
+      const licenseCounts = countTermFrequency(state.filtered, r => toValueList(r.license_type));
+      const topLicenses = sortedEntries(licenseCounts, 12).map(([term, count]) => [shortLabel(term, 56), count]);
+      renderHorizontalBarChart('chart-license', 'License usage', topLicenses, { leftMargin: 300, color: '#FD5A3B' });
+
+      const peerCounts = countTermFrequency(state.filtered, r => getPeerReviewTerms(r.peer_review_type), true);
+      const topPeer = sortedEntries(peerCounts, 5);
+      const peerColors = topPeer.map(([label]) => (label === NOT_AVAILABLE ? '#982E0A' : '#47A178'));
+      renderHorizontalBarChart(
+        'chart-peer-review',
+        'Top 5 peer-review type',
+        topPeer.map(([label, count]) => [shortLabel(label, 56), count]),
+        { leftMargin: 300, colors: peerColors }
+      );
+
+      const pidCounts = countTermFrequency(state.filtered, r => getPidSchemes(r.pid_scheme), true);
+      const topPid = sortedEntries(pidCounts, 5);
+      const pidColors = topPid.map(([label]) => (label === NOT_AVAILABLE ? '#982E0A' : '#3A5959'));
+      renderHorizontalBarChart(
+        'chart-pid',
+        'Top 5 PID scheme',
+        topPid.map(([label, count]) => [shortLabel(formatPidScheme(label), 56), count]),
+        { leftMargin: 300, colors: pidColors }
+      );
+
+      const languageCounts = countTermFrequency(state.filtered, r => getSimpleTerms(r.language));
+      const topLanguages = sortedEntries(languageCounts, 10).map(([term, count]) => [shortLabel(term, 56), count]);
+      renderHorizontalBarChart('chart-languages', 'Top 10 languages', topLanguages, { leftMargin: 280, color: '#A3C386' });
+
+      const publisherCounts = {};
+      for (const record of state.filtered) {
+        const publisher = (record.publisher || '').trim();
+        if (!publisher) continue;
+        publisherCounts[publisher] = (publisherCounts[publisher] || 0) + 1;
+      }
+      const topPublishers = sortedEntries(publisherCounts, 10).map(([name, count]) => [shortLabel(name, 60), count]);
+      renderHorizontalBarChart('chart-publishers', 'Top 10 publishers', topPublishers, { leftMargin: 300, color: '#3A5959' });
+
+      const timelineCounts = {};
+      for (const record of state.filtered) {
+        if (!record.created_date) continue;
+        const date = new Date(record.created_date);
+        if (Number.isNaN(date.getTime())) continue;
+        const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+        timelineCounts[monthKey] = (timelineCounts[monthKey] || 0) + 1;
+      }
+      const timelineKeys = Object.keys(timelineCounts).sort();
       Plotly.newPlot(
-        'chart-country',
+        'chart-timeline',
         [{
-          type:'bar',
-          orientation: 'h',
-          x: countryValues.slice().reverse(),
-          y: countryLabels.slice().reverse(),
-          marker:{color:'#3A5959'}
+          type: 'scatter',
+          mode: 'lines+markers',
+          x: timelineKeys.map(k => `${k}-01`),
+          y: timelineKeys.map(k => timelineCounts[k]),
+          line: { color: '#47A178', width: 2 }
         }],
         {
-          title:'Top countries',
-          margin:{l:260,r:12,t:46,b:48},
-          paper_bgcolor:'rgba(0,0,0,0)',
-          plot_bgcolor:'rgba(0,0,0,0)',
-          font:{color:'#282624'},
-          yaxis:{automargin:true}
+          title: 'Timeline of journals added to DOAJ',
+          margin: { l: 48, r: 12, t: 46, b: 48 },
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#282624' },
+          xaxis: { type: 'date', tickformat: '%b %Y' }
         },
-        {displayModeBar:false}
+        { displayModeBar: false }
       );
 
-      // License mix (horizontal)
-      const licCounts = {};
-      for (const r of state.filtered) {
-        for (const lic of toValueList(r.license_type)) {
-          licCounts[lic] = (licCounts[lic] || 0) + 1;
-        }
-      }
-      const licEntries = Object.entries(licCounts).sort((a, b) => b[1] - a[1]).slice(0, 12);
+      const mapEntries = sortedEntries(countryCounts);
+      const maxCountryCount = Math.max(...mapEntries.map(([, count]) => count), 1);
       Plotly.newPlot(
-        'chart-license',
+        'chart-country-map',
         [{
-          type:'bar',
-          orientation:'h',
-          x: licEntries.map(d => d[1]).reverse(),
-          y: licEntries.map(d => shortLabel(d[0], 52)).reverse(),
-          marker:{color:'#FD5A3B'}
+          type: 'scattergeo',
+          mode: 'markers',
+          locationmode: 'country names',
+          locations: mapEntries.map(([country]) => formatCountry(country)),
+          text: mapEntries.map(([country, count]) => `${formatCountry(country)}: ${formatNumber(count)} journals`),
+          hovertemplate: '%{text}<extra></extra>',
+          marker: {
+            color: '#47A178',
+            opacity: 0.75,
+            line: { color: '#282624', width: 0.5 },
+            size: mapEntries.map(([, count]) => 8 + Math.sqrt(count / maxCountryCount) * 34)
+          }
         }],
         {
-          title:'License mix',
-          margin:{l:280,r:12,t:46,b:48},
-          paper_bgcolor:'rgba(0,0,0,0)',
-          plot_bgcolor:'rgba(0,0,0,0)',
-          font:{color:'#282624'},
-          yaxis:{automargin:true}
+          title: 'Country of publishers (bubble size = journals)',
+          margin: { l: 10, r: 10, t: 46, b: 10 },
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          geo: {
+            showframe: false,
+            showcoastlines: true,
+            coastlinecolor: '#D7D2CE',
+            showcountries: true,
+            countrycolor: '#D7D2CE',
+            showland: true,
+            landcolor: '#FFFFFF',
+            bgcolor: 'rgba(0,0,0,0)',
+            projection: { type: 'natural earth' }
+          }
         },
-        {displayModeBar:false}
+        { displayModeBar: false }
       );
-
-      // APC yes/no (pie)
-      const apcCounts = {yes:0, no:0};
-      for (const r of state.filtered) {
-        if (r.apc_has === true) apcCounts.yes++;
-        else if (r.apc_has === false) apcCounts.no++;
-      }
-      Plotly.newPlot(
-        'chart-apc',
-        [{
-          type:'pie',
-          hole:0.42,
-          labels:['Yes', 'No'],
-          values:[apcCounts.yes, apcCounts.no],
-          marker:{colors:['#FD5A3B','#47A178']}
-        }],
-        {title:'APC presence', paper_bgcolor:'rgba(0,0,0,0)', font:{color:'#282624'}},
-        {displayModeBar:false}
-      );
-
-      // Subjects top 12
-      const subjCounts = {};
-      for (const r of state.filtered) for (const s of (r.subject_terms || [])) subjCounts[s] = (subjCounts[s] || 0) + 1;
-      const subjTop = Object.entries(subjCounts).sort((a,b)=>b[1]-a[1]).slice(0,12);
-      const subjectLabels = subjTop.map(d => shortLabel(d[0], 55));
-      const subjectValues = subjTop.map(d => d[1]);
-      Plotly.newPlot(
-        'chart-subjects',
-        [{
-          type:'bar',
-          orientation: 'h',
-          x: subjectValues.slice().reverse(),
-          y: subjectLabels.slice().reverse(),
-          marker:{color:'#FA9A87'}
-        }],
-        {
-          title:'Subjects (top 12)',
-          margin:{l:320,r:12,t:46,b:48},
-          paper_bgcolor:'rgba(0,0,0,0)',
-          plot_bgcolor:'rgba(0,0,0,0)',
-          font:{color:'#282624'},
-          yaxis:{automargin:true}
-        },
-        {displayModeBar:false}
-      );
-
-      // Timeline by created year
-      const yearCounts = {};
-      for (const r of state.filtered) {
-        if (r.created_date) {
-          const y = new Date(r.created_date).getUTCFullYear();
-          if (!Number.isNaN(y)) yearCounts[y] = (yearCounts[y] || 0) + 1;
-        }
-      }
-      const years = Object.keys(yearCounts).map(Number).sort((a,b)=>a-b);
-      Plotly.newPlot('chart-timeline', [{type:'scatter', mode:'lines+markers', x: years, y: years.map(y=>yearCounts[y]), line:{color:'#47A178'}}], {title:'Created year trend', margin:{l:40,r:10,t:40,b:40}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#282624'}}, {displayModeBar:false});
     }
 
     function renderEmptyCharts() {
-      const ids = ['chart-country', 'chart-license', 'chart-apc', 'chart-subjects', 'chart-timeline'];
-      const titles = ['Top countries', 'License mix', 'APC presence', 'Subjects (top 12)', 'Created year trend'];
-      ids.forEach((id, i) => {
-        Plotly.newPlot(
-          id,
-          [],
-          {
-            title: titles[i],
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { color: '#282624' },
-            xaxis: { visible: false },
-            yaxis: { visible: false },
-            annotations: [{
-              text: 'No data yet',
-              showarrow: false,
-              xref: 'paper',
-              yref: 'paper',
-              x: 0.5,
-              y: 0.5,
-              font: { color: '#282624', size: 14 }
-            }]
-          },
-          { displayModeBar: false }
-        );
-      });
+      const emptyCharts = [
+        ['chart-country', 'Top 10 countries'],
+        ['chart-subjects', 'Top 10 subjects'],
+        ['chart-license', 'License usage'],
+        ['chart-peer-review', 'Top 5 peer-review type'],
+        ['chart-pid', 'Top 5 PID scheme'],
+        ['chart-languages', 'Top 10 languages'],
+        ['chart-publishers', 'Top 10 publishers'],
+        ['chart-timeline', 'Timeline of journals added to DOAJ']
+      ];
+      emptyCharts.forEach(([id, title]) => renderHorizontalBarChart(id, title, []));
+
+      Plotly.newPlot(
+        'chart-country-map',
+        [],
+        {
+          title: 'Country of publishers (bubble size = journals)',
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          geo: { showframe: false, showcoastlines: true, showcountries: true, showland: true },
+          annotations: [{ text: 'No data yet', showarrow: false, x: 0.5, y: 0.5, xref: 'paper', yref: 'paper' }]
+        },
+        { displayModeBar: false }
+      );
     }
 
     function renderTable() {
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = '';
+
       const rows = state.filtered.slice(0, 50);
       document.getElementById('table-count').textContent = `${rows.length} shown of ${state.filtered.length} filtered`;
       if (!rows.length) {
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td colspan="8" class="muted">No journal data available yet.</td>';
+        const td = document.createElement('td');
+        td.colSpan = 7;
+        td.className = 'muted';
+        td.textContent = 'No journal data available yet.';
+        tr.appendChild(td);
         tbody.appendChild(tr);
         return;
       }
-      for (const r of rows) {
-        const licenseText = toValueList(r.license_type).join(', ') || NOT_AVAILABLE;
-        const preservationText = getPreservationTerms(r.preservation_service).join(', ') || NOT_AVAILABLE;
-        const pidText = getPidSchemes(r.pid_scheme).map(formatPidScheme).join(', ') || NOT_AVAILABLE;
+
+      for (const record of rows) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${r.title || NOT_AVAILABLE}</td>
-          <td>${r.publisher || NOT_AVAILABLE}</td>
-          <td>${formatCountry(r.country)}</td>
-          <td>${licenseText}</td>
-          <td>${r.apc_has === true ? '<span class="pill">Yes</span>' : r.apc_has === false ? '<span class="pill negative">No</span>' : NOT_AVAILABLE}</td>
-          <td>${preservationText}</td>
-          <td>${pidText}</td>
-          <td>${r.created_date ? formatDate(r.created_date) : NOT_AVAILABLE}</td>
-        `;
+
+        const titleCell = document.createElement('td');
+        const titleText = record.title || NOT_AVAILABLE;
+        const linkUrl = (record.doaj_url || '').trim();
+        if (linkUrl && /^https?:\/\//i.test(linkUrl) && record.title) {
+          const link = document.createElement('a');
+          link.className = 'table-link';
+          link.href = linkUrl;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = titleText;
+          titleCell.appendChild(link);
+        } else {
+          titleCell.textContent = titleText;
+        }
+        tr.appendChild(titleCell);
+
+        const countryCell = document.createElement('td');
+        countryCell.textContent = formatCountry(record.country);
+        tr.appendChild(countryCell);
+
+        const subjectCell = document.createElement('td');
+        const subjectTerms = toValueList(record.subject_terms);
+        subjectCell.textContent = subjectTerms.length ? shortLabel(subjectTerms[0], 72) : NOT_AVAILABLE;
+        tr.appendChild(subjectCell);
+
+        const apcCell = document.createElement('td');
+        if (record.apc_has === true || record.apc_has === false) {
+          const badge = document.createElement('span');
+          badge.className = `pill${record.apc_has ? '' : ' negative'}`;
+          badge.textContent = record.apc_has ? 'Yes' : 'No';
+          apcCell.appendChild(badge);
+        } else {
+          apcCell.textContent = NOT_AVAILABLE;
+        }
+        tr.appendChild(apcCell);
+
+        const articleCell = document.createElement('td');
+        const articleValue = getArticleRecords(record);
+        articleCell.textContent = articleValue === null ? NOT_AVAILABLE : formatNumber(articleValue);
+        if (isOverOneMonth(record)) {
+          const overTag = document.createElement('span');
+          overTag.className = 'pill warn';
+          overTag.textContent = 'Over 1 month';
+          articleCell.appendChild(overTag);
+        }
+        tr.appendChild(articleCell);
+
+        const includedCell = document.createElement('td');
+        includedCell.textContent = record.created_date ? formatDate(record.created_date) : NOT_AVAILABLE;
+        tr.appendChild(includedCell);
+
+        const updatedCell = document.createElement('td');
+        updatedCell.textContent = record.last_updated ? formatDate(record.last_updated) : NOT_AVAILABLE;
+        tr.appendChild(updatedCell);
+
         tbody.appendChild(tr);
       }
     }
