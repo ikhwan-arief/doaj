@@ -130,13 +130,21 @@
       font-size: 14px;
     }
     .status-banner.hidden { display: none; }
-    .year-range-wrap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-    .year-range-item { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
-    .year-tag { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
-    .year-value { font-size: 13px; color: var(--muted); min-width: 36px; text-align: right; }
-    @media (max-width: 540px) {
-      .year-range-wrap { grid-template-columns: 1fr; }
+    .year-range-wrap { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+    .year-end { font-size: 13px; color: var(--muted); min-width: 42px; text-align: center; font-weight: 700; }
+    .year-range-dual { position: relative; width: 100%; height: 24px; }
+    .year-range-dual input[type="range"] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      margin: 0;
+      pointer-events: none;
+      background: transparent;
     }
+    .year-range-dual input[type="range"]::-webkit-slider-thumb { pointer-events: auto; }
+    .year-range-dual input[type="range"]::-moz-range-thumb { pointer-events: auto; }
+    #year-from { z-index: 3; }
+    #year-to { z-index: 4; }
     input[type="range"] {
       width: 100%;
       padding: 0;
@@ -218,16 +226,12 @@
       <div class="filter-group">
         <label for="year-from">Created Year (horizontal range)</label>
         <div class="year-range-wrap">
-          <div class="year-range-item">
-            <span class="year-tag">From</span>
+          <span class="year-end" id="year-min-label">1900</span>
+          <div class="year-range-dual">
             <input id="year-from" type="range" min="1900" max="2100" value="1900" />
-            <span class="year-value" id="year-from-label">1900</span>
-          </div>
-          <div class="year-range-item">
-            <span class="year-tag">To</span>
             <input id="year-to" type="range" min="1900" max="2100" value="2100" />
-            <span class="year-value" id="year-to-label">2100</span>
           </div>
+          <span class="year-end" id="year-max-label">2100</span>
         </div>
       </div>
       <button id="reset">Reset Filters</button>
@@ -719,10 +723,15 @@
     }
 
     function syncYearLabels() {
-      const fromEl = document.getElementById('year-from');
-      const toEl = document.getElementById('year-to');
-      document.getElementById('year-from-label').textContent = fromEl.value || '—';
-      document.getElementById('year-to-label').textContent = toEl.value || '—';
+      const minEl = document.getElementById('year-min-label');
+      const maxEl = document.getElementById('year-max-label');
+      if (!state.yearBounds) {
+        minEl.textContent = '—';
+        maxEl.textContent = '—';
+        return;
+      }
+      minEl.textContent = String(state.yearBounds.min);
+      maxEl.textContent = String(state.yearBounds.max);
     }
 
     function setupYearRange() {
