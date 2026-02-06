@@ -32,6 +32,7 @@ PAGE_SIZE = 100
 THROTTLE_SECONDS = 0.6  # ~1.6 rps to stay below 2 rps average
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "docs", "data")
 ALL_QUERY_CANDIDATES = ("*:*", "*", "{}")
+MAX_RESULTS_PER_QUERY = 1000
 
 
 def build_session() -> requests.Session:
@@ -206,19 +207,40 @@ def main() -> int:
     total = first.get("total", 0)
     records.extend(first.get("results", []))
 
-    total_pages = math.ceil(total / PAGE_SIZE) if total else 1
-    print(f"Found total {total} journals; fetching {total_pages} pages", file=sys.stderr)
+    target_total = min(total, MAX_RESULTS_PER_QUERY) if total else len(records)
+    total_pages = math.ceil(target_total / PAGE_SIZE) if target_total else 1
+    is_capped = bool(total and total > MAX_RESULTS_PER_QUERY)
+    if is_capped:
+        print(
+            f"Found total {total} journals; API result window limit detected. "
+            f"Fetching first {target_total} journals ({total_pages} pages).",
+            file=sys.stderr,
+        )
+    else:
+        print(f"Found total {total} journals; fetching {total_pages} pages", file=sys.stderr)
 
     for page in range(2, total_pages + 1):
         time.sleep(THROTTLE_SECONDS)
-        payload = fetch_page(session, page=page, query=all_query)
+        try:
+            payload = fetch_page(session, page=page, query=all_query)
+        except requests.HTTPError as err:
+            # Some DOAJ deployments return 400 when page window exceeds limit.
+            if err.response is not None and err.response.status_code == 400:
+                print(
+                    f"Stopped at page {page} due to API result window limit (HTTP 400).",
+                    file=sys.stderr,
+                )
+                break
+            raise
         page_results = payload.get("results", [])
         if not page_results:
             break
         records.extend(page_results)
         print(f"Fetched page {page}/{total_pages}", file=sys.stderr)
+        if len(records) >= target_total:
+            break
 
-    normalized = [normalize_record(r) for r in records]
+    normalized = [normalize_record(r) for r in records[:target_total]]
     agg = aggregate(normalized)
 
     fetched_at = datetime.now(timezone.utc).isoformat()
@@ -235,7 +257,18 @@ def main() -> int:
         json.dump(agg, f, ensure_ascii=False)
 
     with open(meta_path, "w", encoding="utf-8") as f:
-        json.dump({"fetched_at": fetched_at, "source_last_updated_max": agg.get("last_updated_max")}, f, ensure_ascii=False)
+        json.dump(
+            {
+                "fetched_at": fetched_at,
+                "source_last_updated_max": agg.get("last_updated_max"),
+                "source_total": total,
+                "fetched_total": len(normalized),
+                "result_cap": MAX_RESULTS_PER_QUERY,
+                "is_capped": is_capped,
+            },
+            f,
+            ensure_ascii=False,
+        )
 
     print(f"Wrote {journals_path} ({len(normalized)} records)")
     return 0

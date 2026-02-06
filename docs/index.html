@@ -303,7 +303,11 @@
       state.filtered = journalsRes;
       state.aggregates = aggRes || {};
       state.meta = metaRes || {};
-      setStatus('');
+      if (state.meta.is_capped) {
+        setStatus(`Showing ${state.meta.fetched_total || journalsRes.length} of ${state.meta.source_total || journalsRes.length} journals due to DOAJ API result-window limit (${state.meta.result_cap || 1000} records per query).`);
+      } else {
+        setStatus('');
+      }
       populateFilters();
       renderAll();
     }
