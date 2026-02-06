@@ -108,6 +108,28 @@
       box-shadow: var(--shadow);
       min-height: 320px;
     }
+    .apc-country-box { display: flex; flex-direction: column; }
+    .apc-country-control {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin: 2px 6px 8px;
+    }
+    .apc-country-control label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .apc-country-control select {
+      width: auto;
+      min-width: 180px;
+      padding: 6px 8px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+    #chart-apc-distribution { width: 100%; }
     .chart-box.map-box { min-height: 500px; }
     .map-shell { position: relative; }
     .map-plot { min-height: 460px; width: 100%; }
@@ -314,6 +336,8 @@
       .chart-box.map-box { min-height: 360px; }
       .map-plot { min-height: 320px; }
       .map-continent-legend { max-width: 220px; font-size: 11px; }
+      .apc-country-control { justify-content: flex-start; margin: 0 2px 6px; }
+      .apc-country-control select { min-width: 0; width: 100%; }
       .table-box { padding: 10px; }
       .table-toolbar { align-items: flex-start; }
       .table-controls { align-items: stretch; }
@@ -455,6 +479,23 @@
       <div class="chart-row">
         <div class="chart-box" id="chart-publishers"></div>
         <div class="chart-box" id="chart-timeline"></div>
+      </div>
+      <div class="chart-row single">
+        <div class="chart-box apc-country-box">
+          <div class="apc-country-control">
+            <label for="apc-country-continent">Continent</label>
+            <select id="apc-country-continent">
+              <option value="">All continents</option>
+              <option value="Africa">Africa</option>
+              <option value="Asia">Asia</option>
+              <option value="Europe">Europe</option>
+              <option value="North America">North America</option>
+              <option value="South America">South America</option>
+              <option value="Oceania">Oceania</option>
+            </select>
+          </div>
+          <div id="chart-apc-distribution"></div>
+        </div>
       </div>
       <div class="chart-row single">
         <div class="chart-box map-box map-shell" id="chart-country-map-shell">
@@ -1176,12 +1217,116 @@
       return values.length ? Math.max(...values) : 0;
     }
 
+    function computeMedian(values) {
+      if (!Array.isArray(values) || !values.length) return null;
+      const sorted = values
+        .map(value => Number(value))
+        .filter(value => Number.isFinite(value))
+        .sort((a, b) => a - b);
+      if (!sorted.length) return null;
+      const middle = Math.floor(sorted.length / 2);
+      if (sorted.length % 2 === 0) {
+        return (sorted[middle - 1] + sorted[middle]) / 2;
+      }
+      return sorted[middle];
+    }
+
+    function computeAverage(values) {
+      if (!Array.isArray(values) || !values.length) return null;
+      let sum = 0;
+      let count = 0;
+      for (const value of values) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) continue;
+        sum += numeric;
+        count += 1;
+      }
+      if (!count) return null;
+      return sum / count;
+    }
+
+    function getApcCountryStats(records) {
+      const byCountry = {};
+      for (const record of records || []) {
+        if (!record || record.apc_has !== true) continue;
+        const countryName = formatCountry(record.country);
+        if (!countryName || countryName === NOT_AVAILABLE) continue;
+        const eurValue = getMaxApcEur(record);
+        if (!Number.isFinite(eurValue) || eurValue < 0) continue;
+
+        if (!byCountry[countryName]) {
+          byCountry[countryName] = {
+            country: countryName,
+            continent: getCountryContinent(record.country),
+            count: 0,
+            values: []
+          };
+        }
+        byCountry[countryName].count += 1;
+        byCountry[countryName].values.push(eurValue);
+      }
+
+      return Object.values(byCountry)
+        .map(entry => ({
+          country: entry.country,
+          continent: entry.continent,
+          count: entry.count,
+          median: computeMedian(entry.values),
+          average: computeAverage(entry.values)
+        }))
+        .filter(entry => Number.isFinite(entry.median) && Number.isFinite(entry.average))
+        .sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          if (b.median !== a.median) return b.median - a.median;
+          return a.country.localeCompare(b.country);
+        });
+    }
+
+    function buildMonthlyTimeline(records) {
+      const monthCounts = {};
+      let minMonthTime = null;
+      let maxMonthTime = null;
+
+      for (const record of records || []) {
+        if (!record || !record.created_date) continue;
+        const date = new Date(record.created_date);
+        if (Number.isNaN(date.getTime())) continue;
+        const monthTime = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
+        monthCounts[monthTime] = (monthCounts[monthTime] || 0) + 1;
+        if (minMonthTime === null || monthTime < minMonthTime) minMonthTime = monthTime;
+        if (maxMonthTime === null || monthTime > maxMonthTime) maxMonthTime = monthTime;
+      }
+
+      if (minMonthTime === null || maxMonthTime === null) {
+        return { dates: [], counts: [], movingAvg: [] };
+      }
+
+      const dates = [];
+      const counts = [];
+      let cursor = new Date(minMonthTime);
+      const endDate = new Date(maxMonthTime);
+      while (cursor <= endDate) {
+        const monthTime = Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), 1);
+        dates.push(new Date(monthTime).toISOString().slice(0, 10));
+        counts.push(monthCounts[monthTime] || 0);
+        cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+      }
+
+      const movingAvg = counts.map((_, idx) => {
+        const startIdx = Math.max(0, idx - 2);
+        const window = counts.slice(startIdx, idx + 1);
+        const avg = window.reduce((sum, value) => sum + value, 0) / window.length;
+        return Math.round(avg * 10) / 10;
+      });
+
+      return { dates, counts, movingAvg };
+    }
+
     function computeChartScales(records) {
       const scales = {};
 
       const countryCounts = {};
       const publisherCounts = {};
-      const timelineCounts = {};
       const continentCounts = {};
 
       for (const record of records) {
@@ -1195,13 +1340,6 @@
         const publisher = (record.publisher || '').trim();
         if (publisher) publisherCounts[publisher] = (publisherCounts[publisher] || 0) + 1;
 
-        if (record.created_date) {
-          const date = new Date(record.created_date);
-          if (!Number.isNaN(date.getTime())) {
-            const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-            timelineCounts[monthKey] = (timelineCounts[monthKey] || 0) + 1;
-          }
-        }
       }
 
       const subjectCounts = countTermFrequency(records, r => toValueList(r.subject_terms));
@@ -1210,6 +1348,9 @@
       const peerCounts = countTermFrequency(records, r => getPeerReviewTerms(r.peer_review_type), true);
       const pidCounts = countTermFrequency(records, r => getPidSchemes(r.pid_scheme), true);
       const preservationCounts = countTermFrequency(records, r => getPreservationTerms(r.preservation_service), true);
+      const timelineSeries = buildMonthlyTimeline(records);
+      const apcCountryStats = getApcCountryStats(records);
+      const apcCountryMedianMax = apcCountryStats.length ? Math.max(...apcCountryStats.map(entry => entry.median)) : 0;
 
       scales.countryMax = maxCounterValue(countryCounts);
       scales.continentMax = maxCounterValue(continentCounts);
@@ -1220,7 +1361,8 @@
       scales.pidMax = maxCounterValue(pidCounts);
       scales.preservationMax = maxCounterValue(preservationCounts);
       scales.publisherMax = maxCounterValue(publisherCounts);
-      scales.timelineMax = maxCounterValue(timelineCounts);
+      scales.timelineMax = Math.max(...timelineSeries.counts, ...timelineSeries.movingAvg, 0);
+      scales.apcCountryMedianMax = apcCountryMedianMax;
       scales.mapCountryMax = scales.countryMax;
 
       return scales;
@@ -1243,22 +1385,26 @@
       state.searchTerms = [...terms].sort((a, b) => a.localeCompare(b));
     }
 
+    function renderNoDataChart(targetId, title) {
+      Plotly.newPlot(
+        targetId,
+        [],
+        {
+          title,
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#282624' },
+          xaxis: { visible: false },
+          yaxis: { visible: false },
+          annotations: [{ text: 'No data yet', showarrow: false, xref: 'paper', yref: 'paper', x: 0.5, y: 0.5 }]
+        },
+        { displayModeBar: false }
+      );
+    }
+
     function renderHorizontalBarChart(targetId, title, entries, opts = {}) {
       if (!entries.length) {
-        Plotly.newPlot(
-          targetId,
-          [],
-          {
-            title,
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { color: '#282624' },
-            xaxis: { visible: false },
-            yaxis: { visible: false },
-            annotations: [{ text: 'No data yet', showarrow: false, xref: 'paper', yref: 'paper', x: 0.5, y: 0.5 }]
-          },
-          { displayModeBar: false }
-        );
+        renderNoDataChart(targetId, title);
         return;
       }
 
@@ -1301,53 +1447,168 @@
       );
     }
 
-    function renderYesNoPieChart(targetId, title, yesCount, noCount, opts = {}) {
+    function renderYesNoShareChart(targetId, title, yesCount, noCount, opts = {}) {
       const yes = Number(yesCount) || 0;
       const no = Number(noCount) || 0;
       const total = yes + no;
 
       if (total <= 0) {
-        Plotly.newPlot(
-          targetId,
-          [],
-          {
-            title,
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { color: '#282624' },
-            xaxis: { visible: false },
-            yaxis: { visible: false },
-            annotations: [{ text: 'No data yet', showarrow: false, xref: 'paper', yref: 'paper', x: 0.5, y: 0.5 }]
-          },
-          { displayModeBar: false }
-        );
+        renderNoDataChart(targetId, title);
         return;
       }
+
+      const yesPct = (yes / total) * 100;
+      const noPct = (no / total) * 100;
 
       Plotly.newPlot(
         targetId,
         [{
-          type: 'pie',
-          labels: ['Yes', 'No'],
-          values: [yes, no],
-          sort: false,
-          textinfo: 'label+value',
+          type: 'bar',
+          orientation: 'h',
+          name: 'Yes',
+          y: ['Share'],
+          x: [yesPct],
+          customdata: [yes],
+          text: [`${yesPct.toFixed(1)}%`],
           textposition: 'inside',
-          marker: { colors: [opts.yesColor || '#47A178', opts.noColor || '#FD5A3B'] },
-          hovertemplate: '%{label}: %{value:,d} (%{percent})<extra></extra>',
-          textfont: { color: '#282624', size: 13 }
+          marker: { color: opts.yesColor || '#47A178' },
+          hovertemplate: 'Yes: %{customdata:,d} journals (%{x:.1f}%)<extra></extra>',
+          textfont: { color: '#FFFFFF', size: 12 },
+          cliponaxis: false
+        }, {
+          type: 'bar',
+          orientation: 'h',
+          name: 'No',
+          y: ['Share'],
+          x: [noPct],
+          customdata: [no],
+          text: [`${noPct.toFixed(1)}%`],
+          textposition: 'inside',
+          marker: { color: opts.noColor || '#FD5A3B' },
+          hovertemplate: 'No: %{customdata:,d} journals (%{x:.1f}%)<extra></extra>',
+          textfont: { color: '#FFFFFF', size: 12 },
+          cliponaxis: false
         }],
         {
           title,
-          margin: { l: 12, r: 36, t: 46, b: 22 },
+          barmode: 'stack',
+          margin: { l: 20, r: 44, t: 56, b: 44 },
           paper_bgcolor: 'rgba(0,0,0,0)',
           plot_bgcolor: 'rgba(0,0,0,0)',
           font: { color: '#282624' },
+          xaxis: { range: [0, 100], ticksuffix: '%', dtick: 20 },
+          yaxis: { visible: false },
           showlegend: true,
-          legend: { orientation: 'h', x: 0, y: -0.08 }
+          legend: { orientation: 'h', x: 0, y: -0.24 },
+          annotations: [{
+            text: `Total journals: ${formatNumber(total)}`,
+            showarrow: false,
+            xref: 'paper',
+            yref: 'paper',
+            x: 1,
+            y: 1.22,
+            xanchor: 'right',
+            font: { size: 12, color: '#5C5956' }
+          }]
         },
         { displayModeBar: false }
       );
+    }
+
+    function renderApcCountryChart(targetId, title, stats, opts = {}) {
+      const limit = Math.max(1, Number(opts.limit) || 20);
+      const desiredColumns = Math.max(1, Number(opts.columns) || 3);
+      const ordered = (stats || []).slice(0, limit);
+      if (!ordered.length) {
+        renderNoDataChart(targetId, title);
+        return;
+      }
+
+      const columns = [];
+      const rowsPerColumn = Math.ceil(ordered.length / desiredColumns);
+      for (let index = 0; index < desiredColumns; index += 1) {
+        const chunk = ordered.slice(index * rowsPerColumn, (index + 1) * rowsPerColumn);
+        if (chunk.length) columns.push(chunk);
+      }
+
+      const maxMedian = Math.max(Number(opts.fixedMax) || 0, ...ordered.map(entry => Number(entry.median) || 0), 1);
+      const xPad = Math.max(120, maxMedian * 0.28);
+      const xLimit = maxMedian + xPad;
+      const traces = [];
+      const layoutHeight = Math.max(420, rowsPerColumn * 34 + 150);
+      const columnGutter = columns.length === 1 ? 0.02 : (columns.length === 2 ? 0.24 : 0.14);
+      const layout = {
+        title: {
+          text: title,
+          x: 0.5,
+          xanchor: 'center'
+        },
+        height: layoutHeight,
+        grid: {
+          rows: 1,
+          columns: columns.length,
+          pattern: 'independent',
+          xgap: columnGutter
+        },
+        margin: { l: 136, r: 92, t: 72, b: 68 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { color: '#282624' },
+        showlegend: false
+      };
+
+      columns.forEach((columnData, idx) => {
+        const axisNumber = idx + 1;
+        const axisSuffix = axisNumber === 1 ? '' : String(axisNumber);
+        const traceAxisSuffix = axisNumber === 1 ? '' : String(axisNumber);
+        const reversed = columnData.slice().reverse();
+        const labels = reversed.map(entry => shortLabel(entry.country, 26));
+        const values = reversed.map(entry => Math.round(entry.median));
+        const valueText = values.map(value => `EUR ${value.toLocaleString()}`);
+        const customData = reversed.map(entry => [
+          entry.country,
+          entry.count,
+          Math.round(entry.median),
+          Math.round(entry.average),
+          entry.continent
+        ]);
+        const barColors = reversed.map(entry => CONTINENT_COLORS[entry.continent] || CONTINENT_COLORS.Other);
+
+        traces.push({
+          type: 'bar',
+          orientation: 'h',
+          x: values,
+          y: labels,
+          marker: { color: barColors },
+          text: valueText,
+          textposition: 'outside',
+          cliponaxis: false,
+          customdata: customData,
+          hovertemplate: '%{customdata[0]}<br>Median APC: EUR %{customdata[2]:,d}<br>Average APC: EUR %{customdata[3]:,d}<br>APC journals: %{customdata[1]:,d}<br>Continent: %{customdata[4]}<extra></extra>',
+          xaxis: `x${traceAxisSuffix}`,
+          yaxis: `y${traceAxisSuffix}`
+        });
+
+        const xAxisKey = `xaxis${axisSuffix}`;
+        const yAxisKey = `yaxis${axisSuffix}`;
+        layout[xAxisKey] = {
+          range: [0, xLimit],
+          tickformat: ',d',
+          separatethousands: true,
+          title: idx === Math.floor((columns.length - 1) / 2) ? 'EUR' : '',
+          ticklabeloverflow: 'hide past div'
+        };
+        layout[yAxisKey] = {
+          automargin: true,
+          ticklabelstandoff: 12,
+          ticks: 'outside',
+          ticklen: 4,
+          ticklabeloverflow: 'hide past div'
+        };
+
+      });
+
+      Plotly.newPlot(targetId, traces, layout, { displayModeBar: false });
     }
 
     function syncYearLabels() {
@@ -1608,6 +1869,8 @@
       document.querySelectorAll('.filters select').forEach(el => { el.value = ''; });
       document.querySelectorAll('.filters input[type="text"]').forEach(el => { el.value = ''; });
       document.querySelectorAll('.table-inline-filters select').forEach(el => { el.value = ''; });
+      const apcCountryContinentEl = document.getElementById('apc-country-continent');
+      if (apcCountryContinentEl) apcCountryContinentEl.value = '';
       const searchEl = document.getElementById('search-query');
       if (searchEl) searchEl.value = '';
       resetYearRange();
@@ -1710,14 +1973,14 @@
 
       const apcYes = state.filtered.filter(record => record.apc_has === true).length;
       const apcNo = state.filtered.filter(record => record.apc_has === false).length;
-      renderYesNoPieChart('chart-apc-overview', 'Article Processing Charges', apcYes, apcNo, {
+      renderYesNoShareChart('chart-apc-overview', 'Article Processing Charges', apcYes, apcNo, {
         yesColor: '#47A178',
         noColor: '#FD5A3B'
       });
 
       const authorRetainsYes = state.filtered.filter(record => record.author_retains === true).length;
       const authorRetainsNo = state.filtered.filter(record => record.author_retains === false).length;
-      renderYesNoPieChart('chart-author-retains', 'Authors retain copyright', authorRetainsYes, authorRetainsNo, {
+      renderYesNoShareChart('chart-author-retains', 'Authors retain copyright', authorRetainsYes, authorRetainsNo, {
         yesColor: '#3A5959',
         noColor: '#FA9A87'
       });
@@ -1819,38 +2082,70 @@
         fixedMax: state.chartScale.publisherMax
       });
 
-      const timelineCounts = {};
-      for (const record of state.filtered) {
-        if (!record.created_date) continue;
-        const date = new Date(record.created_date);
-        if (Number.isNaN(date.getTime())) continue;
-        const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-        timelineCounts[monthKey] = (timelineCounts[monthKey] || 0) + 1;
+      const timelineSeries = buildMonthlyTimeline(state.filtered);
+      if (!timelineSeries.dates.length) {
+        renderNoDataChart('chart-timeline', 'Timeline of journals added to DOAJ (monthly)');
+      } else {
+        const timelineYMax = Math.max(
+          Number(state.chartScale.timelineMax) || 0,
+          ...timelineSeries.counts,
+          ...timelineSeries.movingAvg,
+          1
+        );
+        Plotly.newPlot(
+          'chart-timeline',
+          [{
+            type: 'bar',
+            name: 'Monthly additions',
+            x: timelineSeries.dates,
+            y: timelineSeries.counts,
+            marker: { color: '#A3C386' },
+            hovertemplate: '%{x|%b %Y}: %{y:,d} journals<extra></extra>'
+          }, {
+            type: 'scatter',
+            mode: 'lines',
+            name: '3-month moving average',
+            x: timelineSeries.dates,
+            y: timelineSeries.movingAvg,
+            line: { color: '#3A5959', width: 3 },
+            hovertemplate: '%{x|%b %Y}: %{y:.1f} journals<extra></extra>'
+          }],
+          {
+            title: 'Timeline of journals added to DOAJ (monthly)',
+            margin: { l: 52, r: 44, t: 46, b: 58 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#282624' },
+            legend: { orientation: 'h', x: 0, y: -0.22 },
+            xaxis: { type: 'date', tickformat: '%b %Y' },
+            yaxis: {
+              tickformat: ',d',
+              separatethousands: true,
+              range: [0, timelineYMax * 1.08]
+            }
+          },
+          { displayModeBar: false }
+        );
       }
-      const timelineKeys = Object.keys(timelineCounts).sort();
-      Plotly.newPlot(
-        'chart-timeline',
-        [{
-          type: 'scatter',
-          mode: 'lines+markers',
-          x: timelineKeys.map(k => `${k}-01`),
-          y: timelineKeys.map(k => timelineCounts[k]),
-          line: { color: '#47A178', width: 2 }
-        }],
+
+      const apcContinent = (document.getElementById('apc-country-continent') || {}).value || '';
+      let apcCountryStats = getApcCountryStats(state.filtered);
+      if (apcContinent) {
+        apcCountryStats = apcCountryStats.filter(entry => entry.continent === apcContinent);
+      }
+      const apcColumns = window.innerWidth <= 700 ? 1 : 2;
+      const apcTitle = apcContinent
+        ? `Top 20 countries by APC amount (median EUR) - ${apcContinent}`
+        : 'Top 20 countries by APC amount (median EUR)';
+      renderApcCountryChart(
+        'chart-apc-distribution',
+        apcTitle,
+        apcCountryStats,
         {
-          title: 'Timeline of journals added to DOAJ',
-          margin: { l: 48, r: 44, t: 46, b: 48 },
-          paper_bgcolor: 'rgba(0,0,0,0)',
-          plot_bgcolor: 'rgba(0,0,0,0)',
-          font: { color: '#282624' },
-          xaxis: { type: 'date', tickformat: '%b %Y' },
-          yaxis: {
-            tickformat: ',d',
-            separatethousands: true,
-            range: [0, Math.max(1, (Number(state.chartScale.timelineMax) || 0) * 1.08)]
-          }
-        },
-        { displayModeBar: false }
+          fixedMax: state.chartScale.apcCountryMedianMax,
+          limit: 20,
+          columns: apcColumns
+        }
       );
 
       const continentOrder = Object.entries(continentCounts).sort((a, b) => b[1] - a[1]).map(([name]) => name);
@@ -1900,8 +2195,8 @@
     }
 
     function renderEmptyCharts() {
-      renderYesNoPieChart('chart-apc-overview', 'Article Processing Charges', 0, 0);
-      renderYesNoPieChart('chart-author-retains', 'Authors retain copyright', 0, 0);
+      renderYesNoShareChart('chart-apc-overview', 'Article Processing Charges', 0, 0);
+      renderYesNoShareChart('chart-author-retains', 'Authors retain copyright', 0, 0);
 
       const emptyCharts = [
         ['chart-country', 'Top 10 countries'],
@@ -1913,9 +2208,10 @@
         ['chart-pid', 'Top 5 Persistent Identifiers'],
         ['chart-preservation', 'Top 5 Preservation Services'],
         ['chart-publishers', 'Top 10 publishers'],
-        ['chart-timeline', 'Timeline of journals added to DOAJ']
+        ['chart-timeline', 'Timeline of journals added to DOAJ (monthly)']
       ];
       emptyCharts.forEach(([id, title]) => renderHorizontalBarChart(id, title, []));
+      renderApcCountryChart('chart-apc-distribution', 'Top 20 countries by APC amount (median EUR)', [], { limit: 20, columns: 2 });
 
       Plotly.newPlot(
         'chart-country-map',
@@ -2061,6 +2357,10 @@
       document.querySelectorAll('.table-inline-filters select').forEach(el => {
         el.addEventListener('change', applyFilters);
       });
+      const apcCountryContinentEl = document.getElementById('apc-country-continent');
+      if (apcCountryContinentEl) {
+        apcCountryContinentEl.addEventListener('change', () => renderCharts());
+      }
       const searchEl = document.getElementById('search-query');
       let searchDebounceTimer = null;
       searchEl.addEventListener('input', () => {
@@ -2118,7 +2418,8 @@
         await loadData();
         if (state.records.length) {
           await loadFxRates();
-          renderTable();
+          state.chartScale = computeChartScales(state.records);
+          renderAll();
         }
       } catch (err) {
         console.error(err);
