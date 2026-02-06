@@ -139,6 +139,44 @@
       box-shadow: 0 6px 14px rgba(40, 38, 36, 0.1);
     }
     .map-fullscreen-btn:hover { background: #F6F4F4; }
+    .map-continent-legend {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 12;
+      max-width: 240px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 6px 14px rgba(40, 38, 36, 0.08);
+      font-size: 12px;
+      color: var(--text);
+    }
+    .map-continent-legend .legend-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .map-continent-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+      white-space: nowrap;
+    }
+    .map-continent-legend .legend-item:last-child { margin-bottom: 0; }
+    .map-continent-legend .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(40, 38, 36, 0.24);
+      flex: 0 0 10px;
+    }
     .map-fullscreen-footer {
       display: none;
       position: absolute;
@@ -256,6 +294,7 @@
       .chart-box { min-height: 260px; padding: 8px; }
       .chart-box.map-box { min-height: 360px; }
       .map-plot { min-height: 320px; }
+      .map-continent-legend { max-width: 220px; font-size: 11px; }
       .table-box { padding: 10px; }
       .table-toolbar { align-items: flex-start; }
       .table-nav { width: 100%; justify-content: space-between; }
@@ -274,6 +313,7 @@
       .chart-box { min-height: 240px; }
       .chart-box.map-box { min-height: 320px; }
       .map-plot { min-height: 280px; }
+      .map-continent-legend { max-width: 180px; padding: 6px 8px; font-size: 10px; }
       .site-footer { padding: 14px 14px 20px; }
     }
   </style>
@@ -394,6 +434,7 @@
       <div class="chart-row single">
         <div class="chart-box map-box map-shell" id="chart-country-map-shell">
           <button id="map-fullscreen-btn" class="map-fullscreen-btn" type="button">Full page map</button>
+          <div id="map-continent-legend" class="map-continent-legend"></div>
           <div id="chart-country-map" class="map-plot"></div>
           <div class="map-fullscreen-footer">&copy; Ikhwan Arief, Universitas Andalas - CC BY-NC-SA - Data source DOAJ</div>
         </div>
@@ -1131,18 +1172,20 @@
           y: plotY,
           marker: { color: plotColors },
           text: plotText,
-          textposition: 'outside',
-          textfont: { color: '#5C5956', size: 12 },
-          cliponaxis: false
+          textposition: 'inside',
+          insidetextanchor: 'end',
+          constraintext: 'inside',
+          textfont: { color: '#FFFFFF', size: 12 },
+          cliponaxis: true
         }],
         {
           title,
-          margin: { l: opts.leftMargin || 280, r: 12, t: 46, b: 48 },
+          margin: { l: opts.leftMargin || 280, r: opts.rightMargin || 44, t: 46, b: 48 },
           paper_bgcolor: 'rgba(0,0,0,0)',
           plot_bgcolor: 'rgba(0,0,0,0)',
           font: { color: '#282624' },
-          xaxis: { tickformat: ',d', separatethousands: true, range: [0, maxValue + xPad] },
-          yaxis: { automargin: true, ticklabelstandoff: 12, ticks: 'outside', ticklen: 4 }
+          xaxis: { tickformat: ',d', separatethousands: true, range: [0, maxValue + xPad], ticklabeloverflow: 'hide past div' },
+          yaxis: { automargin: true, ticklabelstandoff: 12, ticks: 'outside', ticklen: 4, ticklabeloverflow: 'hide past div' }
         },
         { displayModeBar: false }
       );
@@ -1179,13 +1222,14 @@
           values: [yes, no],
           sort: false,
           textinfo: 'label+value',
+          textposition: 'inside',
           marker: { colors: [opts.yesColor || '#47A178', opts.noColor || '#FD5A3B'] },
           hovertemplate: '%{label}: %{value:,d} (%{percent})<extra></extra>',
           textfont: { color: '#282624', size: 13 }
         }],
         {
           title,
-          margin: { l: 12, r: 12, t: 46, b: 22 },
+          margin: { l: 12, r: 36, t: 46, b: 22 },
           paper_bgcolor: 'rgba(0,0,0,0)',
           plot_bgcolor: 'rgba(0,0,0,0)',
           font: { color: '#282624' },
@@ -1477,10 +1521,43 @@
       };
     }
 
+    function renderMapContinentLegend(continentCounts) {
+      const legendEl = document.getElementById('map-continent-legend');
+      if (!legendEl) return;
+
+      const preferredOrder = ['Africa', 'Asia', 'Europe', 'North America', 'South America', 'Oceania'];
+      const items = [];
+
+      for (const name of preferredOrder) {
+        if (!continentCounts || !continentCounts[name]) continue;
+        items.push({ name, color: CONTINENT_COLORS[name] || CONTINENT_COLORS.Other });
+      }
+      if (continentCounts && continentCounts.Other) {
+        items.push({ name: 'Other', color: CONTINENT_COLORS.Other });
+      }
+      if (!items.length) {
+        for (const name of preferredOrder) {
+          items.push({ name, color: CONTINENT_COLORS[name] || CONTINENT_COLORS.Other });
+        }
+      }
+
+      legendEl.innerHTML = `<div class="legend-title">Continents</div>${items.map(item => (
+        `<div class="legend-item"><span class="legend-dot" style="background:${item.color}"></span><span>${item.name}</span></div>`
+      )).join('')}`;
+    }
+
     function resizeMapPlot() {
       const mapEl = document.getElementById('chart-country-map');
       if (!mapEl || typeof Plotly === 'undefined' || !Plotly.Plots || !Plotly.Plots.resize) return;
       Plotly.Plots.resize(mapEl);
+    }
+
+    function updateMapFullscreenButtonLabel() {
+      const mapShell = document.getElementById('chart-country-map-shell');
+      const button = document.getElementById('map-fullscreen-btn');
+      if (!mapShell || !button) return;
+      const isFullscreen = document.fullscreenElement === mapShell || document.webkitFullscreenElement === mapShell;
+      button.textContent = isFullscreen ? 'Back to the main page' : 'Full page map';
     }
 
     function openMapFullscreen() {
@@ -1492,6 +1569,7 @@
       if (isFullscreen) {
         const exit = document.exitFullscreen || document.webkitExitFullscreen;
         if (exit) exit.call(document);
+        setTimeout(updateMapFullscreenButtonLabel, 60);
         return;
       }
 
@@ -1501,6 +1579,7 @@
         mapShell.mozRequestFullScreen ||
         mapShell.msRequestFullscreen;
       if (request) request.call(mapShell);
+      setTimeout(updateMapFullscreenButtonLabel, 60);
       setTimeout(resizeMapPlot, 220);
     }
 
@@ -1617,7 +1696,7 @@
         }],
         {
           title: 'Timeline of journals added to DOAJ',
-          margin: { l: 48, r: 12, t: 46, b: 48 },
+          margin: { l: 48, r: 44, t: 46, b: 48 },
           paper_bgcolor: 'rgba(0,0,0,0)',
           plot_bgcolor: 'rgba(0,0,0,0)',
           font: { color: '#282624' },
@@ -1652,7 +1731,7 @@
         mapTraces,
         {
           title: 'Country of Publishers',
-          margin: { l: 10, r: 12, t: 46, b: 10 },
+          margin: { l: 10, r: 44, t: 46, b: 10 },
           paper_bgcolor: 'rgba(0,0,0,0)',
           showlegend: false,
           geo: {
@@ -1669,6 +1748,7 @@
         },
         getMapPlotConfig()
       );
+      renderMapContinentLegend(continentCounts);
       setTimeout(resizeMapPlot, 50);
     }
 
@@ -1695,6 +1775,7 @@
         [],
         {
           title: 'Country of Publishers',
+          margin: { l: 10, r: 44, t: 46, b: 10 },
           paper_bgcolor: 'rgba(0,0,0,0)',
           showlegend: false,
           geo: { showframe: false, showcoastlines: true, showcountries: true, showland: true },
@@ -1702,6 +1783,7 @@
         },
         getMapPlotConfig()
       );
+      renderMapContinentLegend({});
       setTimeout(resizeMapPlot, 50);
     }
 
@@ -1836,9 +1918,16 @@
       if (mapFullscreenBtn) {
         mapFullscreenBtn.addEventListener('click', openMapFullscreen);
       }
-      document.addEventListener('fullscreenchange', () => setTimeout(resizeMapPlot, 60));
-      document.addEventListener('webkitfullscreenchange', () => setTimeout(resizeMapPlot, 60));
+      document.addEventListener('fullscreenchange', () => {
+        setTimeout(resizeMapPlot, 60);
+        setTimeout(updateMapFullscreenButtonLabel, 60);
+      });
+      document.addEventListener('webkitfullscreenchange', () => {
+        setTimeout(resizeMapPlot, 60);
+        setTimeout(updateMapFullscreenButtonLabel, 60);
+      });
       window.addEventListener('resize', () => setTimeout(resizeMapPlot, 60));
+      updateMapFullscreenButtonLabel();
 
       document.getElementById('table-prev').addEventListener('click', () => {
         if (state.tablePage <= 1) return;
