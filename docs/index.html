@@ -250,6 +250,9 @@
       aggregates: {},
       meta: {}
     };
+    const countryNameFormatter = (typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined')
+      ? new Intl.DisplayNames([navigator.language || 'en', 'en'], { type: 'region' })
+      : null;
 
     function setStatus(message) {
       const el = document.getElementById('status-banner');
@@ -270,6 +273,36 @@
       if (!iso) return "–";
       const d = new Date(iso);
       return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function titleCase(value) {
+      return String(value)
+        .toLowerCase()
+        .replace(/\b([a-z])/g, ch => ch.toUpperCase());
+    }
+
+    function formatCountry(country) {
+      if (!country) return '—';
+      const raw = String(country).trim();
+      const cleaned = raw.replace(/_/g, ' ');
+      const upper = cleaned.toUpperCase();
+
+      if (/^[A-Z]{2}$/.test(upper) && countryNameFormatter) {
+        const resolved = countryNameFormatter.of(upper);
+        if (resolved && resolved !== upper) return resolved;
+      }
+
+      if (/^[A-Z][A-Z\s-]{3,}$/.test(cleaned)) {
+        return titleCase(cleaned);
+      }
+
+      return cleaned;
+    }
+
+    function shortLabel(text, maxLen = 45) {
+      if (!text) return '—';
+      const value = String(text);
+      return value.length <= maxLen ? value : `${value.slice(0, maxLen - 3)}...`;
     }
 
     async function loadJsonOrNull(path) {
@@ -313,13 +346,17 @@
     }
 
     function populateFilters() {
-      const countries = Array.from(new Set(state.records.map(r => r.country).filter(Boolean))).sort();
+      const countries = Array.from(new Set(state.records.map(r => r.country).filter(Boolean)))
+        .sort((a, b) => formatCountry(a).localeCompare(formatCountry(b)));
       const licenses = Array.from(new Set(state.records.map(r => r.license_type).filter(Boolean))).sort();
 
       const countrySelect = document.getElementById('country');
       countrySelect.length = 1;
       countries.forEach(c => {
-        const opt = document.createElement('option'); opt.value = c; opt.textContent = c; countrySelect.appendChild(opt);
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = formatCountry(c);
+        countrySelect.appendChild(opt);
       });
       const licenseSelect = document.getElementById('license');
       licenseSelect.length = 1;
@@ -397,7 +434,27 @@
       const countryCounts = {};
       for (const r of state.filtered) if (r.country) countryCounts[r.country] = (countryCounts[r.country] || 0) + 1;
       const topCountries = Object.entries(countryCounts).sort((a,b) => b[1]-a[1]).slice(0,12);
-      Plotly.newPlot('chart-country', [{type:'bar', x: topCountries.map(d=>d[0]), y: topCountries.map(d=>d[1]), marker:{color:'#3A5959'}}], {title:'Top countries', margin:{l:40,r:10,t:40,b:60}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
+      const countryLabels = topCountries.map(d => formatCountry(d[0]));
+      const countryValues = topCountries.map(d => d[1]);
+      Plotly.newPlot(
+        'chart-country',
+        [{
+          type:'bar',
+          orientation: 'h',
+          x: countryValues.slice().reverse(),
+          y: countryLabels.slice().reverse(),
+          marker:{color:'#3A5959'}
+        }],
+        {
+          title:'Top countries',
+          margin:{l:180,r:10,t:40,b:40},
+          paper_bgcolor:'rgba(0,0,0,0)',
+          plot_bgcolor:'rgba(0,0,0,0)',
+          font:{color:'#F6F4F4'},
+          yaxis:{automargin:true}
+        },
+        {displayModeBar:false}
+      );
 
       // License donut
       const licCounts = {};
@@ -416,7 +473,27 @@
       const subjCounts = {};
       for (const r of state.filtered) for (const s of (r.subject_terms || [])) subjCounts[s] = (subjCounts[s] || 0) + 1;
       const subjTop = Object.entries(subjCounts).sort((a,b)=>b[1]-a[1]).slice(0,12);
-      Plotly.newPlot('chart-subjects', [{type:'bar', x: subjTop.map(d=>d[0]), y: subjTop.map(d=>d[1]), marker:{color:'#FA9A87'}}], {title:'Subjects (top 12)', margin:{l:40,r:10,t:40,b:120}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}, xaxis:{tickangle:-45}}, {displayModeBar:false});
+      const subjectLabels = subjTop.map(d => shortLabel(d[0], 55));
+      const subjectValues = subjTop.map(d => d[1]);
+      Plotly.newPlot(
+        'chart-subjects',
+        [{
+          type:'bar',
+          orientation: 'h',
+          x: subjectValues.slice().reverse(),
+          y: subjectLabels.slice().reverse(),
+          marker:{color:'#FA9A87'}
+        }],
+        {
+          title:'Subjects (top 12)',
+          margin:{l:240,r:10,t:40,b:40},
+          paper_bgcolor:'rgba(0,0,0,0)',
+          plot_bgcolor:'rgba(0,0,0,0)',
+          font:{color:'#F6F4F4'},
+          yaxis:{automargin:true}
+        },
+        {displayModeBar:false}
+      );
 
       // Timeline by created year
       const yearCounts = {};
@@ -475,7 +552,7 @@
         tr.innerHTML = `
           <td>${r.title || '—'}</td>
           <td>${r.publisher || '—'}</td>
-          <td>${r.country || '—'}</td>
+          <td>${formatCountry(r.country)}</td>
           <td>${r.license_type || '—'}</td>
           <td>${r.apc_has === true ? '<span class="pill">Yes</span>' : r.apc_has === false ? '<span class="pill negative">No</span>' : '—'}</td>
           <td>${r.preservation_has === true ? '<span class=\"pill\">Yes</span>' : r.preservation_has === false ? '<span class=\"pill negative\">No</span>' : '—'}</td>
