@@ -21,24 +21,65 @@ import time
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 BASE_URL = os.environ.get("DOAJ_BASE_URL", "https://doaj.org/api/v4")
 PAGE_SIZE = 100
 THROTTLE_SECONDS = 0.6  # ~1.6 rps to stay below 2 rps average
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "docs", "data")
+ALL_QUERY_CANDIDATES = ("*:*", "*", "{}")
 
 
-def fetch_page(page: int) -> Dict[str, Any]:
-    url = f"{BASE_URL}/search/journals/{{}}"
+def build_session() -> requests.Session:
+    """Use retries for transient network/rate-limit responses."""
+    retry = Retry(
+        total=5,
+        connect=5,
+        read=5,
+        backoff_factor=1.0,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset({"GET"}),
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session = requests.Session()
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    session.headers.update(
+        {
+            "Accept": "application/json",
+            "User-Agent": "doaj-dashboard-fetch/1.0",
+        }
+    )
+    return session
+
+
+def fetch_page(session: requests.Session, page: int, query: str) -> Dict[str, Any]:
+    url = f"{BASE_URL}/search/journals/{quote(query, safe='')}"
     params = {
         "page": page,
         "pageSize": PAGE_SIZE,
     }
-    resp = requests.get(url, params=params, timeout=30)
+    resp = session.get(url, params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
+
+
+def discover_query(session: requests.Session) -> str:
+    """Different API deployments can accept different 'match all' query strings."""
+    errors: List[str] = []
+    for query in ALL_QUERY_CANDIDATES:
+        try:
+            payload = fetch_page(session, page=1, query=query)
+            if isinstance(payload.get("results", []), list):
+                return query
+            errors.append(f"{query}: unexpected payload shape")
+        except requests.RequestException as err:
+            errors.append(f"{query}: {err}")
+    raise RuntimeError("Unable to discover DOAJ all-record query. " + " | ".join(errors))
 
 
 def normalize_record(rec: Dict[str, Any]) -> Dict[str, Any]:
@@ -154,11 +195,14 @@ def aggregate(records: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def main() -> int:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    session = build_session()
 
     records: List[Dict[str, Any]] = []
 
     # First page to get total
-    first = fetch_page(1)
+    all_query = discover_query(session)
+    print(f"Using all-record query: {all_query}", file=sys.stderr)
+    first = fetch_page(session, page=1, query=all_query)
     total = first.get("total", 0)
     records.extend(first.get("results", []))
 
@@ -167,7 +211,7 @@ def main() -> int:
 
     for page in range(2, total_pages + 1):
         time.sleep(THROTTLE_SECONDS)
-        payload = fetch_page(page)
+        payload = fetch_page(session, page=page, query=all_query)
         page_results = payload.get("results", [])
         if not page_results:
             break
