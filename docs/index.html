@@ -115,7 +115,9 @@
       align-items: center;
       gap: 8px;
       margin: 2px 6px 8px;
+      flex-wrap: wrap;
     }
+    .apc-country-control-group { display: flex; align-items: center; gap: 6px; }
     .apc-country-control label {
       font-size: 12px;
       font-weight: 700;
@@ -483,16 +485,25 @@
       <div class="chart-row single">
         <div class="chart-box apc-country-box">
           <div class="apc-country-control">
-            <label for="apc-country-continent">Continent</label>
-            <select id="apc-country-continent">
-              <option value="">All continents</option>
-              <option value="Africa">Africa</option>
-              <option value="Asia">Asia</option>
-              <option value="Europe">Europe</option>
-              <option value="North America">North America</option>
-              <option value="South America">South America</option>
-              <option value="Oceania">Oceania</option>
-            </select>
+            <div class="apc-country-control-group">
+              <label for="apc-country-continent">Continent</label>
+              <select id="apc-country-continent">
+                <option value="">All continents</option>
+                <option value="Africa">Africa</option>
+                <option value="Asia">Asia</option>
+                <option value="Europe">Europe</option>
+                <option value="North America">North America</option>
+                <option value="South America">South America</option>
+                <option value="Oceania">Oceania</option>
+              </select>
+            </div>
+            <div class="apc-country-control-group">
+              <label for="apc-currency">Currency</label>
+              <select id="apc-currency">
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
           </div>
           <div id="chart-apc-distribution"></div>
         </div>
@@ -543,7 +554,7 @@
           <th>Country of publisher</th>
           <th>Subject</th>
           <th>APC</th>
-          <th>APC (max EUR)</th>
+          <th id="th-apc-max">APC (max EUR)</th>
           <th>Article records</th>
           <th>Date of inclusion</th>
           <th>Last updated</th>
@@ -1158,6 +1169,17 @@
       return amount / rate;
     }
 
+    function convertFromEur(amount, currency) {
+      if (!Number.isFinite(amount)) return null;
+      const code = normalizeCurrencyCode(currency);
+      if (!code) return null;
+      if (code === 'EUR') return amount;
+      if (!state.fxRates || !Object.prototype.hasOwnProperty.call(state.fxRates, code)) return null;
+      const rate = Number(state.fxRates[code]);
+      if (!Number.isFinite(rate) || rate <= 0) return null;
+      return amount * rate;
+    }
+
     function getMaxApcEur(record) {
       if (!record || record.apc_has !== true) return null;
       const entries = getApcAmountEntries(record);
@@ -1171,9 +1193,25 @@
       return maxEur;
     }
 
-    function formatEuroWhole(value) {
+    function getMaxApcInCurrency(record, targetCurrency = 'EUR') {
+      const currency = normalizeCurrencyCode(targetCurrency) || 'EUR';
+      const maxEur = getMaxApcEur(record);
+      if (!Number.isFinite(maxEur)) return null;
+      if (currency === 'EUR') return maxEur;
+      return convertFromEur(maxEur, currency);
+    }
+
+    function formatCurrencyWhole(value, currency = 'EUR') {
       if (!Number.isFinite(value)) return '0';
-      return `EUR ${Math.round(value).toLocaleString()}`;
+      const code = normalizeCurrencyCode(currency) || 'EUR';
+      return `${code} ${Math.round(value).toLocaleString()}`;
+    }
+
+    function getSelectedApcCurrency() {
+      const select = document.getElementById('apc-currency');
+      const selected = select ? select.value : 'EUR';
+      const code = normalizeCurrencyCode(selected);
+      return code === 'USD' ? 'USD' : 'EUR';
     }
 
     function isOverOneMonth(record) {
@@ -1245,14 +1283,14 @@
       return sum / count;
     }
 
-    function getApcCountryStats(records) {
+    function getApcCountryStats(records, currency = 'EUR') {
       const byCountry = {};
       for (const record of records || []) {
         if (!record || record.apc_has !== true) continue;
         const countryName = formatCountry(record.country);
         if (!countryName || countryName === NOT_AVAILABLE) continue;
-        const eurValue = getMaxApcEur(record);
-        if (!Number.isFinite(eurValue) || eurValue < 0) continue;
+        const currencyValue = getMaxApcInCurrency(record, currency);
+        if (!Number.isFinite(currencyValue) || currencyValue < 0) continue;
 
         if (!byCountry[countryName]) {
           byCountry[countryName] = {
@@ -1263,7 +1301,7 @@
           };
         }
         byCountry[countryName].count += 1;
-        byCountry[countryName].values.push(eurValue);
+        byCountry[countryName].values.push(currencyValue);
       }
 
       return Object.values(byCountry)
@@ -1518,6 +1556,7 @@
     function renderApcCountryChart(targetId, title, stats, opts = {}) {
       const limit = Math.max(1, Number(opts.limit) || 20);
       const desiredColumns = Math.max(1, Number(opts.columns) || 3);
+      const currency = normalizeCurrencyCode(opts.currency) || 'EUR';
       const ordered = (stats || []).slice(0, limit);
       if (!ordered.length) {
         renderNoDataChart(targetId, title);
@@ -1564,7 +1603,7 @@
         const reversed = columnData.slice().reverse();
         const labels = reversed.map(entry => shortLabel(entry.country, 26));
         const values = reversed.map(entry => Math.round(entry.median));
-        const valueText = values.map(value => `EUR ${value.toLocaleString()}`);
+        const valueText = values.map(value => `${currency} ${value.toLocaleString()}`);
         const customData = reversed.map(entry => [
           entry.country,
           entry.count,
@@ -1584,7 +1623,7 @@
           textposition: 'outside',
           cliponaxis: false,
           customdata: customData,
-          hovertemplate: '%{customdata[0]}<br>Median APC: EUR %{customdata[2]:,d}<br>Average APC: EUR %{customdata[3]:,d}<br>APC journals: %{customdata[1]:,d}<br>Continent: %{customdata[4]}<extra></extra>',
+          hovertemplate: `%{customdata[0]}<br>Median APC: ${currency} %{customdata[2]:,d}<br>Average APC: ${currency} %{customdata[3]:,d}<br>APC journals: %{customdata[1]:,d}<br>Continent: %{customdata[4]}<extra></extra>`,
           xaxis: `x${traceAxisSuffix}`,
           yaxis: `y${traceAxisSuffix}`
         });
@@ -1595,7 +1634,6 @@
           range: [0, xLimit],
           tickformat: ',d',
           separatethousands: true,
-          title: idx === Math.floor((columns.length - 1) / 2) ? 'EUR' : '',
           ticklabeloverflow: 'hide past div'
         };
         layout[yAxisKey] = {
@@ -2129,22 +2167,29 @@
       }
 
       const apcContinent = (document.getElementById('apc-country-continent') || {}).value || '';
-      let apcCountryStats = getApcCountryStats(state.filtered);
+      const apcCurrency = getSelectedApcCurrency();
+      const apcCountryScaleStats = getApcCountryStats(state.records, apcCurrency);
+      const apcCountryFixedMax = apcCountryScaleStats.length
+        ? Math.max(...apcCountryScaleStats.map(entry => entry.median))
+        : 0;
+
+      let apcCountryStats = getApcCountryStats(state.filtered, apcCurrency);
       if (apcContinent) {
         apcCountryStats = apcCountryStats.filter(entry => entry.continent === apcContinent);
       }
       const apcColumns = window.innerWidth <= 700 ? 1 : 2;
       const apcTitle = apcContinent
-        ? `Top 20 countries by APC amount (median EUR) - ${apcContinent}`
-        : 'Top 20 countries by APC amount (median EUR)';
+        ? `Top 20 countries by APC amount (median ${apcCurrency}) - ${apcContinent}`
+        : `Top 20 countries by APC amount (median ${apcCurrency})`;
       renderApcCountryChart(
         'chart-apc-distribution',
         apcTitle,
         apcCountryStats,
         {
-          fixedMax: state.chartScale.apcCountryMedianMax,
+          fixedMax: apcCountryFixedMax,
           limit: 20,
-          columns: apcColumns
+          columns: apcColumns,
+          currency: apcCurrency
         }
       );
 
@@ -2211,7 +2256,13 @@
         ['chart-timeline', 'Timeline of journals added to DOAJ (monthly)']
       ];
       emptyCharts.forEach(([id, title]) => renderHorizontalBarChart(id, title, []));
-      renderApcCountryChart('chart-apc-distribution', 'Top 20 countries by APC amount (median EUR)', [], { limit: 20, columns: 2 });
+      const apcCurrency = getSelectedApcCurrency();
+      renderApcCountryChart(
+        'chart-apc-distribution',
+        `Top 20 countries by APC amount (median ${apcCurrency})`,
+        [],
+        { limit: 20, columns: 2, currency: apcCurrency }
+      );
 
       Plotly.newPlot(
         'chart-country-map',
@@ -2233,6 +2284,11 @@
     function renderTable() {
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = '';
+      const apcCurrency = getSelectedApcCurrency();
+      const apcHeaderEl = document.getElementById('th-apc-max');
+      if (apcHeaderEl) {
+        apcHeaderEl.textContent = `APC (max ${apcCurrency})`;
+      }
 
       const sortDirection = document.getElementById('country-sort').value;
       const sorted = [...state.filtered];
@@ -2315,10 +2371,10 @@
         }
         tr.appendChild(apcCell);
 
-        const apcEurCell = document.createElement('td');
-        const maxApcEur = getMaxApcEur(record);
-        apcEurCell.textContent = maxApcEur === null ? '0' : formatEuroWhole(maxApcEur);
-        tr.appendChild(apcEurCell);
+        const apcMaxCell = document.createElement('td');
+        const maxApcValue = getMaxApcInCurrency(record, apcCurrency);
+        apcMaxCell.textContent = maxApcValue === null ? '0' : formatCurrencyWhole(maxApcValue, apcCurrency);
+        tr.appendChild(apcMaxCell);
 
         const articleCell = document.createElement('td');
         const articleValue = getArticleRecords(record);
@@ -2360,6 +2416,13 @@
       const apcCountryContinentEl = document.getElementById('apc-country-continent');
       if (apcCountryContinentEl) {
         apcCountryContinentEl.addEventListener('change', () => renderCharts());
+      }
+      const apcCurrencyEl = document.getElementById('apc-currency');
+      if (apcCurrencyEl) {
+        apcCurrencyEl.addEventListener('change', () => {
+          renderCharts();
+          renderTable();
+        });
       }
       const searchEl = document.getElementById('search-query');
       let searchDebounceTimer = null;
