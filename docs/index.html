@@ -221,8 +221,13 @@
     .table-link:hover { text-decoration: underline; }
     .country-text { font-weight: 700; }
     .table-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
-    .table-search { margin: 8px 0 10px; max-width: 520px; }
+    .table-controls { margin: 8px 0 10px; display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+    .table-search { margin: 0; max-width: 520px; flex: 1 1 320px; }
     .table-search label { display: block; margin-bottom: 4px; }
+    .table-inline-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .table-filter-group { min-width: 185px; }
+    .table-filter-group label { display: block; margin-bottom: 4px; }
+    .table-filter-group select { width: 100%; }
     .table-nav { display: flex; align-items: center; gap: 8px; }
     .table-nav button {
       width: auto;
@@ -311,6 +316,10 @@
       .map-continent-legend { max-width: 220px; font-size: 11px; }
       .table-box { padding: 10px; }
       .table-toolbar { align-items: flex-start; }
+      .table-controls { align-items: stretch; }
+      .table-search { max-width: none; flex-basis: 100%; }
+      .table-inline-filters { width: 100%; }
+      .table-filter-group { flex: 1 1 160px; min-width: 150px; }
       .table-nav { width: 100%; justify-content: space-between; }
       .table-page { min-width: 0; }
       .table-footer { align-items: flex-start; }
@@ -329,6 +338,7 @@
       .chart-box.map-box { min-height: 320px; }
       .map-plot { min-height: 280px; }
       .map-continent-legend { max-width: 180px; padding: 6px 8px; font-size: 10px; }
+      .table-filter-group { min-width: 0; flex-basis: 100%; }
       .site-footer { padding: 14px 14px 20px; }
     }
   </style>
@@ -461,9 +471,29 @@
     <div class="table-toolbar">
       <h3 style="margin:0;">Journals</h3>
     </div>
-    <div class="table-search">
-      <label for="search-query">Search (title, country, subject)</label>
-      <input id="search-query" type="text" placeholder="Start typing..." autocomplete="off" />
+    <div class="table-controls">
+      <div class="table-search">
+        <label for="search-query">Search (title, country, subject)</label>
+        <input id="search-query" type="text" placeholder="Start typing..." autocomplete="off" />
+      </div>
+      <div class="table-inline-filters">
+        <div class="table-filter-group">
+          <label for="table-apc">APC</label>
+          <select id="table-apc">
+            <option value="">All</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <div class="table-filter-group">
+          <label for="table-author-retains">Authors holding copyright</label>
+          <select id="table-author-retains">
+            <option value="">All</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+      </div>
     </div>
     <table>
       <thead>
@@ -1531,6 +1561,8 @@
       const license = document.getElementById('license').value;
       const apc = document.getElementById('apc').value;
       const author = document.getElementById('author-retains').value;
+      const tableApc = document.getElementById('table-apc').value;
+      const tableAuthor = document.getElementById('table-author-retains').value;
       const peerReview = document.getElementById('peer-review').value;
       const language = document.getElementById('language').value;
       const publisher = document.getElementById('publisher').value.trim().toLowerCase();
@@ -1545,6 +1577,10 @@
         if (apc === 'no' && r.apc_has !== false) return false;
         if (author === 'yes' && r.author_retains !== true) return false;
         if (author === 'no' && r.author_retains !== false) return false;
+        if (tableApc === 'yes' && r.apc_has !== true) return false;
+        if (tableApc === 'no' && r.apc_has !== false) return false;
+        if (tableAuthor === 'yes' && r.author_retains !== true) return false;
+        if (tableAuthor === 'no' && r.author_retains !== false) return false;
         if (peerReview && !getPeerReviewTerms(r.peer_review_type).includes(peerReview)) return false;
         if (language && !getSimpleTerms(r.language).includes(language)) return false;
         if (publisher && !(r.publisher || '').toLowerCase().includes(publisher)) return false;
@@ -1571,6 +1607,7 @@
     function resetFilters() {
       document.querySelectorAll('.filters select').forEach(el => { el.value = ''; });
       document.querySelectorAll('.filters input[type="text"]').forEach(el => { el.value = ''; });
+      document.querySelectorAll('.table-inline-filters select').forEach(el => { el.value = ''; });
       const searchEl = document.getElementById('search-query');
       if (searchEl) searchEl.value = '';
       resetYearRange();
@@ -2020,6 +2057,9 @@
       document.querySelectorAll('.filters select, .filters input[type="text"]').forEach(el => {
         el.addEventListener('change', applyFilters);
         el.addEventListener('keyup', ev => { if (ev.key === 'Enter') applyFilters(); });
+      });
+      document.querySelectorAll('.table-inline-filters select').forEach(el => {
+        el.addEventListener('change', applyFilters);
       });
       const searchEl = document.getElementById('search-query');
       let searchDebounceTimer = null;
