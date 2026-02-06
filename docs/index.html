@@ -366,6 +366,8 @@
       const cleaned = String(value).replace(/\s+/g, ' ').trim();
       if (!cleaned) return '';
       const normalized = normalizeForMatch(cleaned);
+      const cleanedLower = cleaned.toLowerCase();
+      if (cleanedLower.includes('удк')) return 'UDC';
 
       const aliases = [
         { re: /\bcross\s*ref\b|\bcrossref\b|\bcrossreff\b|\bcrossref doi\b|\bdoi.*crossref\b|\bcrossref.*doi\b/, canonical: 'CrossRef' },
@@ -376,13 +378,32 @@
         { re: /\bissn\b/, canonical: 'ISSN' },
         { re: /\bdoi\b/, canonical: 'DOI' },
         { re: /\bark\b/, canonical: 'ARK' },
-        { re: /\burn\b/, canonical: 'URN' },
-        { re: /\bhandle\b/, canonical: 'Handle' }
+        { re: /\burns?\b/, canonical: 'URN' },
+        { re: /\bhandles?\b/, canonical: 'Handle' },
+        { re: /\bdors?\b|\bdigital object recognizer\b/, canonical: 'DOR' },
+        { re: /\bpurls?\b/, canonical: 'PURL' },
+        { re: /\bcoden\b/, canonical: 'CODEN' },
+        { re: /\budc\b|\budk\b|\buniversal decimal classification\b|\bудк\b/, canonical: 'UDC' },
+        { re: /\bedn\b/, canonical: 'EDN' },
+        { re: /\buri\b|\bdc identifier uri\b/, canonical: 'URI' },
+        { re: /\bnbn\b/, canonical: 'NBN' },
+        { re: /\bgicid\b/, canonical: 'GICID' },
+        { re: /\bbiblid\b/, canonical: 'BIBLID' },
+        { re: /\bcu\s*id\b/, canonical: 'CU-ID' },
+        { re: /\bcrossmark\b/, canonical: 'Crossmark' },
+        { re: /\bcstr\b/, canonical: 'CSTR' },
+        { re: /\bjel\b/, canonical: 'JEL' },
+        { re: /\boai\b/, canonical: 'OAI' },
+        { re: /\bqr\b.*\bcode\b/, canonical: 'QR Code' },
+        { re: /\bpid\b/, canonical: 'PID' },
+        { re: /\bedu\s*nl\b/, canonical: 'Edu.nl' }
       ];
 
       for (const alias of aliases) {
         if (alias.re.test(normalized)) return alias.canonical;
       }
+
+      if (/https?:\/\/|www\./.test(cleanedLower)) return 'URL';
 
       return smartTitle(cleaned);
     }

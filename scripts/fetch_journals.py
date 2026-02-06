@@ -166,6 +166,9 @@ def canonicalize_pid_scheme_term(value: str) -> str:
         return ""
 
     normalized = normalize_for_match(cleaned)
+    cleaned_lower = cleaned.lower()
+    if "удк" in cleaned_lower:
+        return "UDC"
 
     aliases = [
         (r"\bcross\s*ref\b|\bcrossref\b|\bcrossreff\b|\bcrossref doi\b|\bdoi.*crossref\b|\bcrossref.*doi\b", "CrossRef"),
@@ -176,13 +179,33 @@ def canonicalize_pid_scheme_term(value: str) -> str:
         (r"\bissn\b", "ISSN"),
         (r"\bdoi\b", "DOI"),
         (r"\bark\b", "ARK"),
-        (r"\burn\b", "URN"),
-        (r"\bhandle\b", "Handle"),
+        (r"\burns?\b", "URN"),
+        (r"\bhandles?\b", "Handle"),
+        (r"\bdors?\b|\bdigital object recognizer\b", "DOR"),
+        (r"\bpurls?\b", "PURL"),
+        (r"\bcoden\b", "CODEN"),
+        (r"\budc\b|\budk\b|\buniversal decimal classification\b|\bудк\b", "UDC"),
+        (r"\bedn\b", "EDN"),
+        (r"\buri\b|\bdc identifier uri\b", "URI"),
+        (r"\bnbn\b", "NBN"),
+        (r"\bgicid\b", "GICID"),
+        (r"\bbiblid\b", "BIBLID"),
+        (r"\bcu\s*id\b", "CU-ID"),
+        (r"\bcrossmark\b", "Crossmark"),
+        (r"\bcstr\b", "CSTR"),
+        (r"\bjel\b", "JEL"),
+        (r"\boai\b", "OAI"),
+        (r"\bqr\b.*\bcode\b", "QR Code"),
+        (r"\bpid\b", "PID"),
+        (r"\bedu\s*nl\b", "Edu.nl"),
     ]
 
     for pattern, canonical in aliases:
         if re.search(pattern, normalized):
             return canonical
+
+    if re.search(r"https?://|www\.", cleaned_lower):
+        return "URL"
 
     return smart_title(cleaned)
 
