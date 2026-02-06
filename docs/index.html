@@ -485,6 +485,7 @@
       filtered: [],
       aggregates: {},
       meta: {},
+      chartScale: {},
       fxRates: null,
       fxDate: null,
       fxSource: null,
@@ -1116,6 +1117,61 @@
       return counts;
     }
 
+    function maxCounterValue(counterObj) {
+      const values = Object.values(counterObj || {}).map(v => Number(v) || 0);
+      return values.length ? Math.max(...values) : 0;
+    }
+
+    function computeChartScales(records) {
+      const scales = {};
+
+      const countryCounts = {};
+      const publisherCounts = {};
+      const timelineCounts = {};
+      const continentCounts = {};
+
+      for (const record of records) {
+        const country = record.country;
+        if (country) {
+          countryCounts[country] = (countryCounts[country] || 0) + 1;
+          const continent = getContinent(country);
+          continentCounts[continent] = (continentCounts[continent] || 0) + 1;
+        }
+
+        const publisher = (record.publisher || '').trim();
+        if (publisher) publisherCounts[publisher] = (publisherCounts[publisher] || 0) + 1;
+
+        if (record.created_date) {
+          const date = new Date(record.created_date);
+          if (!Number.isNaN(date.getTime())) {
+            const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+            timelineCounts[monthKey] = (timelineCounts[monthKey] || 0) + 1;
+          }
+        }
+      }
+
+      const subjectCounts = countTermFrequency(records, r => toValueList(r.subject_terms));
+      const languageCounts = countTermFrequency(records, r => getSimpleTerms(r.language));
+      const licenseCounts = countTermFrequency(records, r => toValueList(r.license_type));
+      const peerCounts = countTermFrequency(records, r => getPeerReviewTerms(r.peer_review_type), true);
+      const pidCounts = countTermFrequency(records, r => getPidSchemes(r.pid_scheme), true);
+      const preservationCounts = countTermFrequency(records, r => getPreservationTerms(r.preservation_service), true);
+
+      scales.countryMax = maxCounterValue(countryCounts);
+      scales.continentMax = maxCounterValue(continentCounts);
+      scales.subjectMax = maxCounterValue(subjectCounts);
+      scales.languageMax = maxCounterValue(languageCounts);
+      scales.licenseMax = maxCounterValue(licenseCounts);
+      scales.peerMax = maxCounterValue(peerCounts);
+      scales.pidMax = maxCounterValue(pidCounts);
+      scales.preservationMax = maxCounterValue(preservationCounts);
+      scales.publisherMax = maxCounterValue(publisherCounts);
+      scales.timelineMax = maxCounterValue(timelineCounts);
+      scales.mapCountryMax = scales.countryMax;
+
+      return scales;
+    }
+
     function buildSearchTerms(records) {
       const terms = new Set();
       for (const record of records) {
@@ -1160,7 +1216,7 @@
       const plotY = labels.slice().reverse();
       const plotColors = colors.slice().reverse();
       const plotText = plotX.map(v => Number(v || 0).toLocaleString());
-      const maxValue = Math.max(...values.map(v => Number(v || 0)), 0);
+      const maxValue = Math.max(Number(opts.fixedMax) || 0, ...values.map(v => Number(v || 0)), 0);
       const xPad = maxValue > 0 ? Math.max(1, maxValue * 0.12) : 1;
 
       Plotly.newPlot(
@@ -1324,6 +1380,7 @@
         state.filtered = [];
         state.aggregates = aggRes || {};
         state.meta = metaRes || {};
+        state.chartScale = {};
         setStatus('Data is not available yet. Trigger the "Fetch DOAJ journals (hourly)" GitHub Action, then refresh this page.');
         renderAll();
         return;
@@ -1333,6 +1390,7 @@
       state.filtered = journalsRes;
       state.aggregates = aggRes || {};
       state.meta = metaRes || {};
+      state.chartScale = computeChartScales(state.records);
       state.tablePage = 1;
       buildSearchTerms(state.records);
       setStatus('');
@@ -1608,10 +1666,14 @@
         if (record.country) countryCounts[record.country] = (countryCounts[record.country] || 0) + 1;
       }
       const topCountries = sortedEntries(countryCounts, 10).map(([country, count]) => [formatCountry(country), count]);
-      renderHorizontalBarChart('chart-country', 'Top 10 countries', topCountries, { leftMargin: 260, color: '#3A5959' });
+      renderHorizontalBarChart('chart-country', 'Top 10 countries', topCountries, {
+        leftMargin: 260,
+        color: '#3A5959',
+        fixedMax: state.chartScale.countryMax
+      });
 
       const mapEntries = sortedEntries(countryCounts);
-      const maxCountryCount = Math.max(...mapEntries.map(([, count]) => count), 1);
+      const maxCountryCount = Math.max(Number(state.chartScale.mapCountryMax) || 0, ...mapEntries.map(([, count]) => count), 1);
       const continentCounts = {};
       const continentBuckets = {};
       for (const [country, count] of mapEntries) {
@@ -1622,19 +1684,35 @@
       }
       const continentEntries = sortedEntries(continentCounts).map(([continent, count]) => [continent, count]);
       const continentColors = continentEntries.map(([continent]) => CONTINENT_COLORS[continent] || CONTINENT_COLORS.Other);
-      renderHorizontalBarChart('chart-continent', 'Journals in each continent', continentEntries, { leftMargin: 210, colors: continentColors });
+      renderHorizontalBarChart('chart-continent', 'Journals in each continent', continentEntries, {
+        leftMargin: 210,
+        colors: continentColors,
+        fixedMax: state.chartScale.continentMax
+      });
 
       const languageCounts = countTermFrequency(state.filtered, r => getSimpleTerms(r.language));
       const topLanguages = sortedEntries(languageCounts, 10).map(([term, count]) => [shortLabel(term, 56), count]);
-      renderHorizontalBarChart('chart-languages', 'Top 10 languages', topLanguages, { leftMargin: 280, color: '#A3C386' });
+      renderHorizontalBarChart('chart-languages', 'Top 10 languages', topLanguages, {
+        leftMargin: 280,
+        color: '#A3C386',
+        fixedMax: state.chartScale.languageMax
+      });
 
       const subjectCounts = countTermFrequency(state.filtered, r => toValueList(r.subject_terms));
       const topSubjects = sortedEntries(subjectCounts, 10).map(([term, count]) => [shortLabel(term, 60), count]);
-      renderHorizontalBarChart('chart-subjects', 'Top 10 subjects', topSubjects, { leftMargin: 320, color: '#FA9A87' });
+      renderHorizontalBarChart('chart-subjects', 'Top 10 subjects', topSubjects, {
+        leftMargin: 320,
+        color: '#FA9A87',
+        fixedMax: state.chartScale.subjectMax
+      });
 
       const licenseCounts = countTermFrequency(state.filtered, r => toValueList(r.license_type));
       const topLicenses = sortedEntries(licenseCounts, 12).map(([term, count]) => [shortLabel(term, 56), count]);
-      renderHorizontalBarChart('chart-license', 'License usage', topLicenses, { leftMargin: 300, color: '#FD5A3B' });
+      renderHorizontalBarChart('chart-license', 'License usage', topLicenses, {
+        leftMargin: 300,
+        color: '#FD5A3B',
+        fixedMax: state.chartScale.licenseMax
+      });
 
       const peerCounts = countTermFrequency(state.filtered, r => getPeerReviewTerms(r.peer_review_type), true);
       const topPeer = sortedEntries(peerCounts, 5);
@@ -1643,7 +1721,7 @@
         'chart-peer-review',
         'Top 5 peer-review type',
         topPeer.map(([label, count]) => [shortLabel(label, 56), count]),
-        { leftMargin: 300, colors: peerColors }
+        { leftMargin: 300, colors: peerColors, fixedMax: state.chartScale.peerMax }
       );
 
       const pidCounts = countTermFrequency(state.filtered, r => getPidSchemes(r.pid_scheme), true);
@@ -1653,7 +1731,7 @@
         'chart-pid',
         'Top 5 Persistent Identifiers',
         topPid.map(([label, count]) => [shortLabel(formatPidScheme(label), 56), count]),
-        { leftMargin: 300, colors: pidColors }
+        { leftMargin: 300, colors: pidColors, fixedMax: state.chartScale.pidMax }
       );
 
       const preservationCounts = countTermFrequency(state.filtered, r => getPreservationTerms(r.preservation_service), true);
@@ -1664,7 +1742,7 @@
         'chart-preservation',
         'Top 5 Preservation Services',
         topPreservation.map(([label, count]) => [shortLabel(label, 58), count]),
-        { leftMargin: 320, colors: preservationColors }
+        { leftMargin: 320, colors: preservationColors, fixedMax: state.chartScale.preservationMax }
       );
 
       const publisherCounts = {};
@@ -1674,7 +1752,11 @@
         publisherCounts[publisher] = (publisherCounts[publisher] || 0) + 1;
       }
       const topPublishers = sortedEntries(publisherCounts, 10).map(([name, count]) => [shortLabel(name, 60), count]);
-      renderHorizontalBarChart('chart-publishers', 'Top 10 publishers', topPublishers, { leftMargin: 300, color: '#3A5959' });
+      renderHorizontalBarChart('chart-publishers', 'Top 10 publishers', topPublishers, {
+        leftMargin: 300,
+        color: '#3A5959',
+        fixedMax: state.chartScale.publisherMax
+      });
 
       const timelineCounts = {};
       for (const record of state.filtered) {
@@ -1701,7 +1783,11 @@
           plot_bgcolor: 'rgba(0,0,0,0)',
           font: { color: '#282624' },
           xaxis: { type: 'date', tickformat: '%b %Y' },
-          yaxis: { tickformat: ',d', separatethousands: true }
+          yaxis: {
+            tickformat: ',d',
+            separatethousands: true,
+            range: [0, Math.max(1, (Number(state.chartScale.timelineMax) || 0) * 1.08)]
+          }
         },
         { displayModeBar: false }
       );
@@ -1971,6 +2057,7 @@
         state.records = [];
         state.filtered = [];
         state.meta = {};
+        state.chartScale = {};
         setStatus('Unable to load dashboard data. Check GitHub Actions logs and refresh.');
         renderAll();
       }
