@@ -130,12 +130,12 @@
       font-size: 14px;
     }
     .status-banner.hidden { display: none; }
-    .year-range-wrap { display: flex; flex-direction: column; gap: 8px; }
-    .year-range-values {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      color: var(--muted);
+    .year-range-wrap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .year-range-item { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+    .year-tag { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .year-value { font-size: 13px; color: var(--muted); min-width: 36px; text-align: right; }
+    @media (max-width: 540px) {
+      .year-range-wrap { grid-template-columns: 1fr; }
     }
     input[type="range"] {
       width: 100%;
@@ -206,24 +206,6 @@
         </select>
       </div>
       <div class="filter-group">
-        <label for="preservation">Preservation</label>
-        <select id="preservation">
-          <option value="">All</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="deposit-policy">Deposit Policy Directory</label>
-        <select id="deposit-policy">
-          <option value="">All</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="pid">PID Scheme</label>
-        <select id="pid">
-          <option value="">All</option>
-        </select>
-      </div>
-      <div class="filter-group">
         <label for="language">Languages</label>
         <select id="language">
           <option value="">All</option>
@@ -236,11 +218,15 @@
       <div class="filter-group">
         <label for="year-from">Created Year (horizontal range)</label>
         <div class="year-range-wrap">
-          <input id="year-from" type="range" min="1900" max="2100" value="1900" />
-          <input id="year-to" type="range" min="1900" max="2100" value="2100" />
-          <div class="year-range-values">
-            <span id="year-from-label">1900</span>
-            <span id="year-to-label">2100</span>
+          <div class="year-range-item">
+            <span class="year-tag">From</span>
+            <input id="year-from" type="range" min="1900" max="2100" value="1900" />
+            <span class="year-value" id="year-from-label">1900</span>
+          </div>
+          <div class="year-range-item">
+            <span class="year-tag">To</span>
+            <input id="year-to" type="range" min="1900" max="2100" value="2100" />
+            <span class="year-value" id="year-to-label">2100</span>
           </div>
         </div>
       </div>
@@ -834,12 +820,6 @@
         .sort((a, b) => String(a).localeCompare(String(b)));
       const peerReviews = Array.from(new Set(state.records.flatMap(r => getPeerReviewTerms(r.peer_review_type))))
         .sort((a, b) => String(a).localeCompare(String(b)));
-      const preservations = Array.from(new Set(state.records.flatMap(r => getPreservationTerms(r.preservation_service))))
-        .sort((a, b) => String(a).localeCompare(String(b)));
-      const depositPolicyDirectories = Array.from(new Set(state.records.flatMap(r => getDepositPolicyTerms(r.deposit_policy_directory))))
-        .sort((a, b) => String(a).localeCompare(String(b)));
-      const pidSchemes = Array.from(new Set(state.records.flatMap(r => getPidSchemes(r.pid_scheme))))
-        .sort((a, b) => String(a).localeCompare(String(b)));
       const languages = Array.from(new Set(state.records.flatMap(r => getSimpleTerms(r.language))))
         .sort((a, b) => String(a).localeCompare(String(b)));
 
@@ -879,33 +859,6 @@
         peerReviewSelect.appendChild(opt);
       });
 
-      const preservationSelect = document.getElementById('preservation');
-      preservationSelect.length = 1;
-      preservations.forEach(service => {
-        const opt = document.createElement('option');
-        opt.value = service;
-        opt.textContent = service;
-        preservationSelect.appendChild(opt);
-      });
-
-      const depositPolicySelect = document.getElementById('deposit-policy');
-      depositPolicySelect.length = 1;
-      depositPolicyDirectories.forEach(directory => {
-        const opt = document.createElement('option');
-        opt.value = directory;
-        opt.textContent = directory;
-        depositPolicySelect.appendChild(opt);
-      });
-
-      const pidSelect = document.getElementById('pid');
-      pidSelect.length = 1;
-      pidSchemes.forEach(scheme => {
-        const opt = document.createElement('option');
-        opt.value = scheme;
-        opt.textContent = formatPidScheme(scheme);
-        pidSelect.appendChild(opt);
-      });
-
       const languageSelect = document.getElementById('language');
       languageSelect.length = 1;
       languages.forEach(language => {
@@ -925,9 +878,6 @@
       const apc = document.getElementById('apc').value;
       const author = document.getElementById('author-retains').value;
       const peerReview = document.getElementById('peer-review').value;
-      const preservation = document.getElementById('preservation').value;
-      const depositPolicy = document.getElementById('deposit-policy').value;
-      const pid = document.getElementById('pid').value;
       const language = document.getElementById('language').value;
       const publisher = document.getElementById('publisher').value.trim().toLowerCase();
       const yearFrom = parseInt(document.getElementById('year-from').value, 10);
@@ -942,9 +892,6 @@
         if (author === 'yes' && r.author_retains !== true) return false;
         if (author === 'no' && r.author_retains !== false) return false;
         if (peerReview && !getPeerReviewTerms(r.peer_review_type).includes(peerReview)) return false;
-        if (preservation && !getPreservationTerms(r.preservation_service).includes(preservation)) return false;
-        if (depositPolicy && !getDepositPolicyTerms(r.deposit_policy_directory).includes(depositPolicy)) return false;
-        if (pid && !getPidSchemes(r.pid_scheme).includes(pid)) return false;
         if (language && !getSimpleTerms(r.language).includes(language)) return false;
         if (publisher && !(r.publisher || '').toLowerCase().includes(publisher)) return false;
         if (state.yearBounds && !Number.isNaN(yearFrom) && !Number.isNaN(yearTo)) {
@@ -979,7 +926,7 @@
       document.getElementById('kpi-languages').textContent = formatNumber(languages.size);
       document.getElementById('kpi-no-apc').textContent = formatNumber(noApc);
 
-      const metaText = `Fetched: ${formatDate(state.meta.fetched_at)} | Source last updated: ${formatDate(state.meta.source_last_updated_max)}`;
+      const metaText = `Source last updated: ${formatDate(state.meta.source_last_updated_max)}`;
       document.getElementById('meta-info').textContent = metaText;
     }
 
