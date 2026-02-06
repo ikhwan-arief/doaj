@@ -119,6 +119,20 @@
     .pill.warn { background: rgba(152,46,10,0.18); color: #982E0A; margin-left: 6px; }
     .table-link { color: #982E0A; text-decoration: none; font-weight: 600; }
     .table-link:hover { text-decoration: underline; }
+    .table-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+    .table-nav { display: flex; align-items: center; gap: 8px; }
+    .table-nav button {
+      width: auto;
+      padding: 6px 12px;
+      font-size: 13px;
+      border-radius: 8px;
+      background: #3A5959;
+      color: #FFFFFF;
+      letter-spacing: 0;
+      font-weight: 600;
+    }
+    .table-nav button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .table-page { font-size: 13px; color: var(--muted); min-width: 108px; text-align: center; }
     .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; background: #22c55e; }
     .status-banner {
       margin: 0 28px 14px;
@@ -188,6 +202,11 @@
         <select id="subject-filter"><option value="">All</option></select>
       </div>
       <div class="filter-group">
+        <label for="search-query">Search (title, country, subject)</label>
+        <input id="search-query" list="search-suggestions" type="text" placeholder="Start typing..." />
+        <datalist id="search-suggestions"></datalist>
+      </div>
+      <div class="filter-group">
         <label for="license">License Type</label>
         <select id="license"><option value="">All</option></select>
       </div>
@@ -222,6 +241,14 @@
       <div class="filter-group">
         <label for="publisher">Publisher (text)</label>
         <input id="publisher" type="text" placeholder="contains…" />
+      </div>
+      <div class="filter-group">
+        <label for="country-sort">Country Sort (table)</label>
+        <select id="country-sort">
+          <option value="">Default</option>
+          <option value="asc">Ascending (A-Z)</option>
+          <option value="desc">Descending (Z-A)</option>
+        </select>
       </div>
       <div class="filter-group">
         <label for="year-from">Created Year (horizontal range)</label>
@@ -261,8 +288,13 @@
   </div>
 
   <div class="table-box">
-    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-      <h3 style="margin:0;">Journals (first 50 of filtered)</h3>
+    <div class="table-toolbar">
+      <h3 style="margin:0;">Journals</h3>
+      <div class="table-nav">
+        <button id="table-prev" type="button">Prev</button>
+        <span class="table-page" id="table-page">Page 1 of 1</span>
+        <button id="table-next" type="button">Next</button>
+      </div>
       <div class="muted" id="table-count">–</div>
     </div>
     <table>
@@ -289,7 +321,10 @@
       filtered: [],
       aggregates: {},
       meta: {},
-      yearBounds: null
+      yearBounds: null,
+      tablePage: 1,
+      tablePageSize: 50,
+      searchTerms: []
     };
     const NOT_AVAILABLE = 'Not available';
     const countryNameFormatter = (typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined')
@@ -833,6 +868,41 @@
       return counts;
     }
 
+    function buildSearchTerms(records) {
+      const terms = new Set();
+      for (const record of records) {
+        const title = (record.title || '').trim();
+        if (title) terms.add(title);
+
+        const country = formatCountry(record.country);
+        if (country && country !== NOT_AVAILABLE) terms.add(country);
+
+        for (const subject of toValueList(record.subject_terms)) {
+          const cleaned = String(subject).trim();
+          if (cleaned) terms.add(cleaned);
+        }
+      }
+      state.searchTerms = [...terms].sort((a, b) => a.localeCompare(b));
+    }
+
+    function updateSearchSuggestions(inputValue) {
+      const list = document.getElementById('search-suggestions');
+      if (!list) return;
+      list.innerHTML = '';
+      const query = String(inputValue || '').trim().toLowerCase();
+      if (!query) return;
+
+      let added = 0;
+      for (const term of state.searchTerms) {
+        if (!term.toLowerCase().includes(query)) continue;
+        const option = document.createElement('option');
+        option.value = term;
+        list.appendChild(option);
+        added += 1;
+        if (added >= 30) break;
+      }
+    }
+
     function renderHorizontalBarChart(targetId, title, entries, opts = {}) {
       if (!entries.length) {
         Plotly.newPlot(
@@ -971,6 +1041,8 @@
       state.filtered = journalsRes;
       state.aggregates = aggRes || {};
       state.meta = metaRes || {};
+      state.tablePage = 1;
+      buildSearchTerms(state.records);
       setStatus('');
       populateFilters();
       renderAll();
@@ -1039,6 +1111,7 @@
     function applyFilters() {
       const country = document.getElementById('country').value;
       const subjectFilter = document.getElementById('subject-filter').value;
+      const searchQuery = document.getElementById('search-query').value.trim().toLowerCase();
       const license = document.getElementById('license').value;
       const apc = document.getElementById('apc').value;
       const author = document.getElementById('author-retains').value;
@@ -1059,6 +1132,12 @@
         if (peerReview && !getPeerReviewTerms(r.peer_review_type).includes(peerReview)) return false;
         if (language && !getSimpleTerms(r.language).includes(language)) return false;
         if (publisher && !(r.publisher || '').toLowerCase().includes(publisher)) return false;
+        if (searchQuery) {
+          const titleHit = (r.title || '').toLowerCase().includes(searchQuery);
+          const countryHit = (formatCountry(r.country) || '').toLowerCase().includes(searchQuery);
+          const subjectHit = toValueList(r.subject_terms).some(term => String(term).toLowerCase().includes(searchQuery));
+          if (!titleHit && !countryHit && !subjectHit) return false;
+        }
         if (state.yearBounds && !Number.isNaN(yearFrom) && !Number.isNaN(yearTo)) {
           const usesYearNarrowing = yearFrom > state.yearBounds.min || yearTo < state.yearBounds.max;
           if (usesYearNarrowing) {
@@ -1069,14 +1148,17 @@
         }
         return true;
       });
+      state.tablePage = 1;
       renderAll();
     }
 
     function resetFilters() {
       document.querySelectorAll('.filters select').forEach(el => { el.value = ''; });
       document.querySelectorAll('.filters input[type="text"]').forEach(el => { el.value = ''; });
+      updateSearchSuggestions('');
       resetYearRange();
       state.filtered = state.records;
+      state.tablePage = 1;
       renderAll();
     }
 
@@ -1273,8 +1355,33 @@
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = '';
 
-      const rows = state.filtered.slice(0, 50);
-      document.getElementById('table-count').textContent = `${rows.length} shown of ${state.filtered.length} filtered`;
+      const sortDirection = document.getElementById('country-sort').value;
+      const sorted = [...state.filtered];
+      if (sortDirection === 'asc' || sortDirection === 'desc') {
+        const dir = sortDirection === 'asc' ? 1 : -1;
+        sorted.sort((a, b) => {
+          const countryCompare = formatCountry(a.country).localeCompare(formatCountry(b.country));
+          if (countryCompare !== 0) return countryCompare * dir;
+          return String(a.title || '').localeCompare(String(b.title || ''));
+        });
+      }
+
+      const total = sorted.length;
+      const pageSize = state.tablePageSize;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      if (state.tablePage > totalPages) state.tablePage = totalPages;
+      if (state.tablePage < 1) state.tablePage = 1;
+
+      const startIndex = (state.tablePage - 1) * pageSize;
+      const rows = sorted.slice(startIndex, startIndex + pageSize);
+      const shownFrom = total ? startIndex + 1 : 0;
+      const shownTo = total ? startIndex + rows.length : 0;
+
+      document.getElementById('table-count').textContent = `${shownFrom}-${shownTo} of ${total} filtered`;
+      document.getElementById('table-page').textContent = `Page ${state.tablePage} of ${totalPages}`;
+      document.getElementById('table-prev').disabled = state.tablePage <= 1;
+      document.getElementById('table-next').disabled = state.tablePage >= totalPages;
+
       if (!rows.length) {
         const tr = document.createElement('tr');
         const td = document.createElement('td');
@@ -1359,6 +1466,25 @@
         el.addEventListener('change', applyFilters);
         el.addEventListener('keyup', ev => { if (ev.key === 'Enter') applyFilters(); });
       });
+      const searchEl = document.getElementById('search-query');
+      let searchDebounceTimer = null;
+      searchEl.addEventListener('input', () => {
+        updateSearchSuggestions(searchEl.value);
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => applyFilters(), 180);
+      });
+      searchEl.addEventListener('change', () => updateSearchSuggestions(searchEl.value));
+
+      document.getElementById('table-prev').addEventListener('click', () => {
+        if (state.tablePage <= 1) return;
+        state.tablePage -= 1;
+        renderTable();
+      });
+      document.getElementById('table-next').addEventListener('click', () => {
+        state.tablePage += 1;
+        renderTable();
+      });
+
       const fromEl = document.getElementById('year-from');
       const toEl = document.getElementById('year-to');
       fromEl.addEventListener('input', () => {
