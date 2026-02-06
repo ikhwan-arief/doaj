@@ -111,6 +111,7 @@ def normalize_record(rec: Dict[str, Any]) -> Dict[str, Any]:
         return str(val)
 
     apc = _first_dict(bj.get("apc"))
+    apc_max = _first_dict(apc.get("max"))
     license_raw = bj.get("license")
     license_block = _first_dict(license_raw)
     copyright_block = _first_dict(bj.get("copyright"))
@@ -148,8 +149,8 @@ def normalize_record(rec: Dict[str, Any]) -> Dict[str, Any]:
         "pissn": bj.get("pissn"),
         "eissn": bj.get("eissn"),
         "apc_has": bool(apc.get("has_apc")) if apc.get("has_apc") is not None else None,
-        "apc_max_price": (apc.get("max", {}) or {}).get("price"),
-        "apc_max_currency": (apc.get("max", {}) or {}).get("currency"),
+        "apc_max_price": apc_max.get("price"),
+        "apc_max_currency": apc_max.get("currency"),
         "waiver_has": bool(waiver_block.get("has_waiver")) if waiver_block.get("has_waiver") is not None else None,
         "license_type": license_type,
         "license_url": license_url,
