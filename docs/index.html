@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DOAJ Journals Dashboard</title>
+  <title>Open Access Journals in DOAJ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600;700&family=Source+Sans+Pro:wght@400;600;700&family=Source+Code+Pro:wght@500&display=swap" rel="stylesheet">
@@ -40,6 +40,8 @@
     }
     h1 { margin: 0; font-size: 26px; letter-spacing: -0.4px; font-family: 'Spectral', 'Source Sans Pro', serif; }
     .muted { color: var(--muted); font-size: 14px; }
+    .subline a { color: #982E0A; text-decoration: none; font-weight: 700; }
+    .subline a:hover { text-decoration: underline; }
     .layout {
       display: grid;
       grid-template-columns: 320px 1fr;
@@ -102,6 +104,35 @@
       min-height: 320px;
     }
     .chart-box.map-box { min-height: 500px; }
+    .map-shell { position: relative; }
+    .map-plot { min-height: 460px; width: 100%; }
+    #chart-country-map:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      background: var(--bg);
+    }
+    #chart-country-map:-webkit-full-screen {
+      width: 100vw;
+      height: 100vh;
+      background: var(--bg);
+    }
+    .map-fullscreen-btn {
+      position: absolute;
+      right: 12px;
+      top: 10px;
+      z-index: 12;
+      width: auto;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #FFFFFF;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0;
+      box-shadow: 0 6px 14px rgba(40, 38, 36, 0.1);
+    }
+    .map-fullscreen-btn:hover { background: #F6F4F4; }
     .table-box {
       margin: 18px 28px 40px;
       background: var(--card);
@@ -120,6 +151,8 @@
     .table-link { color: #982E0A; text-decoration: none; font-weight: 600; }
     .table-link:hover { text-decoration: underline; }
     .table-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+    .table-search { margin: 8px 0 10px; max-width: 520px; }
+    .table-search label { display: block; margin-bottom: 4px; }
     .table-nav { display: flex; align-items: center; gap: 8px; }
     .table-nav button {
       width: auto;
@@ -196,6 +229,7 @@
       .card .value { font-size: 20px; }
       .chart-box { min-height: 260px; padding: 8px; }
       .chart-box.map-box { min-height: 360px; }
+      .map-plot { min-height: 320px; }
       .table-box { padding: 10px; }
       .table-toolbar { align-items: flex-start; }
       .table-nav { width: 100%; justify-content: space-between; }
@@ -213,6 +247,7 @@
       .table-box { margin: 14px 14px 24px; }
       .chart-box { min-height: 240px; }
       .chart-box.map-box { min-height: 320px; }
+      .map-plot { min-height: 280px; }
       .site-footer { padding: 14px 14px 20px; }
     }
   </style>
@@ -220,8 +255,8 @@
 <body>
   <header>
     <div>
-      <h1>DOAJ Journals Dashboard</h1>
-      <div class="muted">Live snapshot (hourly) from DOAJ CSV source</div>
+      <h1>Open Access Journals in DOAJ</h1>
+      <div class="muted subline">Live snapshot (hourly) from DOAJ public data dump - <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer">CC0</a></div>
     </div>
     <div style="flex:1"></div>
     <div class="muted" id="meta-info">Loading…</div>
@@ -246,11 +281,6 @@
       <div class="filter-group">
         <label for="subject-filter">Subjects</label>
         <select id="subject-filter"><option value="">All</option></select>
-      </div>
-      <div class="filter-group">
-        <label for="search-query">Search (title, country, subject)</label>
-        <input id="search-query" list="search-suggestions" type="text" placeholder="Start typing..." />
-        <datalist id="search-suggestions"></datalist>
       </div>
       <div class="filter-group">
         <label for="license">License Type</label>
@@ -313,6 +343,10 @@
     <div class="charts">
       <div class="chart-row">
         <div class="chart-box" id="chart-country"></div>
+        <div class="chart-box" id="chart-continent"></div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-box" id="chart-languages"></div>
         <div class="chart-box" id="chart-subjects"></div>
       </div>
       <div class="chart-row">
@@ -321,14 +355,17 @@
       </div>
       <div class="chart-row">
         <div class="chart-box" id="chart-pid"></div>
-        <div class="chart-box" id="chart-languages"></div>
+        <div class="chart-box" id="chart-preservation"></div>
       </div>
       <div class="chart-row">
         <div class="chart-box" id="chart-publishers"></div>
         <div class="chart-box" id="chart-timeline"></div>
       </div>
       <div class="chart-row single">
-        <div class="chart-box map-box" id="chart-country-map"></div>
+        <div class="chart-box map-box map-shell" id="chart-country-map-shell">
+          <button id="map-fullscreen-btn" class="map-fullscreen-btn" type="button">Zoom</button>
+          <div id="chart-country-map" class="map-plot"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -342,6 +379,11 @@
         <button id="table-next" type="button">Next</button>
       </div>
       <div class="muted" id="table-count">–</div>
+    </div>
+    <div class="table-search">
+      <label for="search-query">Search (title, country, subject)</label>
+      <input id="search-query" list="search-suggestions" type="text" placeholder="Start typing..." />
+      <datalist id="search-suggestions"></datalist>
     </div>
     <table>
       <thead>
@@ -362,11 +404,7 @@
 
   <footer class="site-footer">
     <div class="footer-row">
-      <div>Copyright: Ikhwan Arief, Universitas Andalas, Indonesia</div>
-      <div>License: <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a></div>
-    </div>
-    <div class="footer-row footer-source">
-      <div>Data source: <a href="https://doaj.org/docs/public-data-dump/" target="_blank" rel="noopener noreferrer">DOAJ</a></div>
+      <div>&copy; Ikhwan Arief, Universitas Andalas. <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA</a>. Data source: <a href="https://doaj.org/docs/public-data-dump/" target="_blank" rel="noopener noreferrer">DOAJ</a></div>
     </div>
   </footer>
 
@@ -1347,6 +1385,8 @@
     function resetFilters() {
       document.querySelectorAll('.filters select').forEach(el => { el.value = ''; });
       document.querySelectorAll('.filters input[type="text"]').forEach(el => { el.value = ''; });
+      const searchEl = document.getElementById('search-query');
+      if (searchEl) searchEl.value = '';
       updateSearchSuggestions('');
       resetYearRange();
       state.filtered = state.records;
@@ -1369,6 +1409,41 @@
       document.getElementById('meta-info').textContent = metaText;
     }
 
+    function getMapPlotConfig() {
+      return {
+        displayModeBar: false,
+        scrollZoom: false,
+        doubleClick: false,
+        responsive: true
+      };
+    }
+
+    function resizeMapPlot() {
+      const mapEl = document.getElementById('chart-country-map');
+      if (!mapEl || typeof Plotly === 'undefined' || !Plotly.Plots || !Plotly.Plots.resize) return;
+      Plotly.Plots.resize(mapEl);
+    }
+
+    function openMapFullscreen() {
+      const mapEl = document.getElementById('chart-country-map');
+      if (!mapEl) return;
+
+      const isFullscreen = document.fullscreenElement === mapEl || document.webkitFullscreenElement === mapEl;
+      if (isFullscreen) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (exit) exit.call(document);
+        return;
+      }
+
+      const request =
+        mapEl.requestFullscreen ||
+        mapEl.webkitRequestFullscreen ||
+        mapEl.mozRequestFullScreen ||
+        mapEl.msRequestFullscreen;
+      if (request) request.call(mapEl);
+      setTimeout(resizeMapPlot, 220);
+    }
+
     function renderCharts() {
       if (!state.filtered.length) {
         renderEmptyCharts();
@@ -1381,6 +1456,24 @@
       }
       const topCountries = sortedEntries(countryCounts, 10).map(([country, count]) => [formatCountry(country), count]);
       renderHorizontalBarChart('chart-country', 'Top 10 countries', topCountries, { leftMargin: 260, color: '#3A5959' });
+
+      const mapEntries = sortedEntries(countryCounts);
+      const maxCountryCount = Math.max(...mapEntries.map(([, count]) => count), 1);
+      const continentCounts = {};
+      const continentBuckets = {};
+      for (const [country, count] of mapEntries) {
+        const continent = getContinent(country);
+        continentCounts[continent] = (continentCounts[continent] || 0) + count;
+        if (!continentBuckets[continent]) continentBuckets[continent] = [];
+        continentBuckets[continent].push([country, count]);
+      }
+      const continentEntries = sortedEntries(continentCounts).map(([continent, count]) => [continent, count]);
+      const continentColors = continentEntries.map(([continent]) => CONTINENT_COLORS[continent] || CONTINENT_COLORS.Other);
+      renderHorizontalBarChart('chart-continent', 'Journal in Each Continent', continentEntries, { leftMargin: 210, colors: continentColors });
+
+      const languageCounts = countTermFrequency(state.filtered, r => getSimpleTerms(r.language));
+      const topLanguages = sortedEntries(languageCounts, 10).map(([term, count]) => [shortLabel(term, 56), count]);
+      renderHorizontalBarChart('chart-languages', 'Top 10 languages', topLanguages, { leftMargin: 280, color: '#A3C386' });
 
       const subjectCounts = countTermFrequency(state.filtered, r => toValueList(r.subject_terms));
       const topSubjects = sortedEntries(subjectCounts, 10).map(([term, count]) => [shortLabel(term, 60), count]);
@@ -1405,14 +1498,19 @@
       const pidColors = topPid.map(([label]) => (label === NOT_AVAILABLE ? '#982E0A' : '#3A5959'));
       renderHorizontalBarChart(
         'chart-pid',
-        'Top 5 PID scheme',
+        'Top 5 Persistent Identifiers',
         topPid.map(([label, count]) => [shortLabel(formatPidScheme(label), 56), count]),
         { leftMargin: 300, colors: pidColors }
       );
 
-      const languageCounts = countTermFrequency(state.filtered, r => getSimpleTerms(r.language));
-      const topLanguages = sortedEntries(languageCounts, 10).map(([term, count]) => [shortLabel(term, 56), count]);
-      renderHorizontalBarChart('chart-languages', 'Top 10 languages', topLanguages, { leftMargin: 280, color: '#A3C386' });
+      const preservationCounts = countTermFrequency(state.filtered, r => getPreservationTerms(r.preservation_service), true);
+      const topPreservation = sortedEntries(preservationCounts, 5);
+      renderHorizontalBarChart(
+        'chart-preservation',
+        'Top 5 Preservation Services',
+        topPreservation.map(([label, count]) => [shortLabel(label, 58), count]),
+        { leftMargin: 320, color: '#982E0A' }
+      );
 
       const publisherCounts = {};
       for (const record of state.filtered) {
@@ -1453,16 +1551,6 @@
         { displayModeBar: false }
       );
 
-      const mapEntries = sortedEntries(countryCounts);
-      const maxCountryCount = Math.max(...mapEntries.map(([, count]) => count), 1);
-      const continentCounts = {};
-      const continentBuckets = {};
-      for (const [country, count] of mapEntries) {
-        const continent = getContinent(country);
-        continentCounts[continent] = (continentCounts[continent] || 0) + count;
-        if (!continentBuckets[continent]) continentBuckets[continent] = [];
-        continentBuckets[continent].push([country, count]);
-      }
       const continentOrder = Object.entries(continentCounts).sort((a, b) => b[1] - a[1]).map(([name]) => name);
       const mapTraces = continentOrder.map(continent => {
         const entries = continentBuckets[continent] || [];
@@ -1470,7 +1558,7 @@
           type: 'scattergeo',
           mode: 'markers',
           locationmode: 'country names',
-          name: `${continent} (${formatNumber(continentCounts[continent])})`,
+          name: continent,
           locations: entries.map(([country]) => formatCountry(country)),
           text: entries.map(([country, count]) => `${formatCountry(country)}: ${formatNumber(count)} journals`),
           hovertemplate: '%{text}<extra></extra>',
@@ -1488,21 +1576,10 @@
         mapTraces,
         {
           title: 'Country of Publishers',
-          margin: { l: 10, r: 210, t: 46, b: 10 },
+          margin: { l: 10, r: 12, t: 46, b: 10 },
           paper_bgcolor: 'rgba(0,0,0,0)',
-          legend: {
-            x: 1.02,
-            y: 1,
-            xanchor: 'left',
-            yanchor: 'top',
-            bgcolor: 'rgba(255,255,255,0.85)',
-            bordercolor: '#D7D2CE',
-            borderwidth: 1,
-            font: { color: '#282624', size: 12 },
-            title: { text: 'Journal titles in each continent' }
-          },
+          showlegend: false,
           geo: {
-            domain: { x: [0, 0.79], y: [0, 1] },
             showframe: false,
             showcoastlines: true,
             coastlinecolor: '#D7D2CE',
@@ -1514,18 +1591,21 @@
             projection: { type: 'natural earth' }
           }
         },
-        { displayModeBar: false }
+        getMapPlotConfig()
       );
+      setTimeout(resizeMapPlot, 50);
     }
 
     function renderEmptyCharts() {
       const emptyCharts = [
         ['chart-country', 'Top 10 countries'],
+        ['chart-continent', 'Journal in Each Continent'],
+        ['chart-languages', 'Top 10 languages'],
         ['chart-subjects', 'Top 10 subjects'],
         ['chart-license', 'License usage'],
         ['chart-peer-review', 'Top 5 peer-review type'],
-        ['chart-pid', 'Top 5 PID scheme'],
-        ['chart-languages', 'Top 10 languages'],
+        ['chart-pid', 'Top 5 Persistent Identifiers'],
+        ['chart-preservation', 'Top 5 Preservation Services'],
         ['chart-publishers', 'Top 10 publishers'],
         ['chart-timeline', 'Timeline of journals added to DOAJ']
       ];
@@ -1537,11 +1617,13 @@
         {
           title: 'Country of Publishers',
           paper_bgcolor: 'rgba(0,0,0,0)',
+          showlegend: false,
           geo: { showframe: false, showcoastlines: true, showcountries: true, showland: true },
           annotations: [{ text: 'No data yet', showarrow: false, x: 0.5, y: 0.5, xref: 'paper', yref: 'paper' }]
         },
-        { displayModeBar: false }
+        getMapPlotConfig()
       );
+      setTimeout(resizeMapPlot, 50);
     }
 
     function renderTable() {
@@ -1672,6 +1754,14 @@
         searchDebounceTimer = setTimeout(() => applyFilters(), 180);
       });
       searchEl.addEventListener('change', () => updateSearchSuggestions(searchEl.value));
+
+      const mapFullscreenBtn = document.getElementById('map-fullscreen-btn');
+      if (mapFullscreenBtn) {
+        mapFullscreenBtn.addEventListener('click', openMapFullscreen);
+      }
+      document.addEventListener('fullscreenchange', () => setTimeout(resizeMapPlot, 60));
+      document.addEventListener('webkitfullscreenchange', () => setTimeout(resizeMapPlot, 60));
+      window.addEventListener('resize', () => setTimeout(resizeMapPlot, 60));
 
       document.getElementById('table-prev').addEventListener('click', () => {
         if (state.tablePage <= 1) return;
