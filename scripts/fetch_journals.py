@@ -86,6 +86,7 @@ def canonicalize_preservation_term(value: str) -> str:
 
     aliases = [
         (r"\bajol\b|\bafrican journals? online\b", "African Journals Online"),
+        (r"\bzenodo\b|\bzenedo\b|\bzenodoo\b", "Zenodo"),
         (r"\bclockss\b", "CLOCKSS"),
         (r"\blockss\b", "LOCKSS"),
         (r"\bpkp\b.*\bpn\b|\bpkp preservation network\b", "PKP Preservation Network"),
@@ -110,6 +111,8 @@ def canonicalize_preservation_term(value: str) -> str:
         if len(inner) > 4 and " " in inner:
             return inner
 
+    if cleaned.islower() or cleaned.isupper():
+        return cleaned.title()
     return cleaned
 
 
@@ -118,6 +121,47 @@ def canonicalize_preservation_services(values: Sequence[str]) -> List[str]:
     canonical: List[str] = []
     for value in values:
         term = canonicalize_preservation_term(value)
+        if term and term not in seen:
+            seen.add(term)
+            canonical.append(term)
+    return canonical
+
+
+def canonicalize_pid_scheme_term(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    if not cleaned:
+        return ""
+
+    normalized = re.sub(r"[^a-z0-9\s]", " ", cleaned.lower())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    aliases = [
+        (r"\bcross\s*ref\b|\bcrossref\b|\bcrossreff\b|\bcrossref doi\b|\bdoi.*crossref\b|\bcrossref.*doi\b", "CrossRef"),
+        (r"\bdata\s*cite\b|\bdatacite\b|\bdatacitee\b", "DataCite"),
+        (r"\borcid\b", "ORCID"),
+        (r"\bpmcid\b", "PMCID"),
+        (r"\bpmid\b", "PMID"),
+        (r"\bissn\b", "ISSN"),
+        (r"\bdoi\b", "DOI"),
+        (r"\bark\b", "ARK"),
+        (r"\burn\b", "URN"),
+        (r"\bhandle\b", "Handle"),
+    ]
+
+    for pattern, canonical in aliases:
+        if re.search(pattern, normalized):
+            return canonical
+
+    if cleaned.islower() or cleaned.isupper():
+        return cleaned.title()
+    return cleaned
+
+
+def canonicalize_pid_schemes(values: Sequence[str]) -> List[str]:
+    seen = set()
+    canonical: List[str] = []
+    for value in values:
+        term = canonicalize_pid_scheme_term(value)
         if term and term not in seen:
             seen.add(term)
             canonical.append(term)
@@ -253,15 +297,17 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
         get_value(row, lookup, ["preservationservice", "preservationservices", "digitalarchivingpolicy"])
         )
     )
-    pid_schemes = split_multi(
-        get_value(
-            row,
-            lookup,
-            [
-                "persistentarticleidentifiers",
-                "pidscheme",
-                "persistentidentifiers",
-            ],
+    pid_schemes = canonicalize_pid_schemes(
+        split_multi(
+            get_value(
+                row,
+                lookup,
+                [
+                    "persistentarticleidentifiers",
+                    "pidscheme",
+                    "persistentidentifiers",
+                ],
+            )
         )
     )
     subjects = split_multi(

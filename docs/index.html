@@ -312,11 +312,42 @@
     }
 
     function formatPidScheme(value) {
-      if (!value) return NOT_AVAILABLE;
-      const raw = String(value).trim();
-      if (!raw) return NOT_AVAILABLE;
-      if (/^[a-z0-9_-]+$/i.test(raw)) return raw.toUpperCase();
-      return raw;
+      const canonical = normalizePidSchemeTerm(value);
+      return canonical || NOT_AVAILABLE;
+    }
+
+    function normalizePidSchemeTerm(value) {
+      if (!value) return '';
+      const cleaned = String(value).replace(/\s+/g, ' ').trim();
+      if (!cleaned) return '';
+      const normalized = cleaned.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+      const aliases = [
+        { re: /\bcross\s*ref\b|\bcrossref\b|\bcrossreff\b|\bcrossref doi\b|\bdoi.*crossref\b|\bcrossref.*doi\b/, canonical: 'CrossRef' },
+        { re: /\bdata\s*cite\b|\bdatacite\b|\bdatacitee\b/, canonical: 'DataCite' },
+        { re: /\borcid\b/, canonical: 'ORCID' },
+        { re: /\bpmcid\b/, canonical: 'PMCID' },
+        { re: /\bpmid\b/, canonical: 'PMID' },
+        { re: /\bissn\b/, canonical: 'ISSN' },
+        { re: /\bdoi\b/, canonical: 'DOI' },
+        { re: /\bark\b/, canonical: 'ARK' },
+        { re: /\burn\b/, canonical: 'URN' },
+        { re: /\bhandle\b/, canonical: 'Handle' }
+      ];
+
+      for (const alias of aliases) {
+        if (alias.re.test(normalized)) return alias.canonical;
+      }
+
+      if (cleaned === cleaned.toLowerCase() || cleaned === cleaned.toUpperCase()) {
+        return titleCase(cleaned);
+      }
+      return cleaned;
+    }
+
+    function getPidSchemes(value) {
+      const terms = toValueList(value).map(normalizePidSchemeTerm).filter(Boolean);
+      return [...new Set(terms)];
     }
 
     function normalizePreservationTerm(value) {
@@ -327,6 +358,7 @@
 
       const aliases = [
         { re: /\bajol\b|\bafrican journals? online\b/, canonical: 'African Journals Online' },
+        { re: /\bzenodo\b|\bzenedo\b|\bzenodoo\b/, canonical: 'Zenodo' },
         { re: /\bclockss\b/, canonical: 'CLOCKSS' },
         { re: /\blockss\b/, canonical: 'LOCKSS' },
         { re: /\bpkp\b.*\bpn\b|\bpkp preservation network\b/, canonical: 'PKP Preservation Network' },
@@ -347,6 +379,9 @@
         if (inner.length > 4 && inner.includes(' ')) return inner;
       }
 
+      if (cleaned === cleaned.toLowerCase() || cleaned === cleaned.toUpperCase()) {
+        return titleCase(cleaned);
+      }
       return cleaned;
     }
 
@@ -495,7 +530,7 @@
         .sort((a, b) => String(a).localeCompare(String(b)));
       const preservations = Array.from(new Set(state.records.flatMap(r => getPreservationTerms(r.preservation_service))))
         .sort((a, b) => String(a).localeCompare(String(b)));
-      const pidSchemes = Array.from(new Set(state.records.flatMap(r => toValueList(r.pid_scheme))))
+      const pidSchemes = Array.from(new Set(state.records.flatMap(r => getPidSchemes(r.pid_scheme))))
         .sort((a, b) => String(a).localeCompare(String(b)));
 
       const countrySelect = document.getElementById('country');
@@ -553,7 +588,7 @@
         if (author === 'yes' && r.author_retains !== true) return false;
         if (author === 'no' && r.author_retains !== false) return false;
         if (preservation && !getPreservationTerms(r.preservation_service).includes(preservation)) return false;
-        if (pid && !toValueList(r.pid_scheme).includes(pid)) return false;
+        if (pid && !getPidSchemes(r.pid_scheme).includes(pid)) return false;
         if (publisher && !(r.publisher || '').toLowerCase().includes(publisher)) return false;
         if (subject && !(r.subject_terms || []).some(s => s.toLowerCase().includes(subject))) return false;
         if (state.yearBounds && !Number.isNaN(yearFrom) && !Number.isNaN(yearTo)) {
@@ -732,7 +767,7 @@
       for (const r of rows) {
         const licenseText = toValueList(r.license_type).join(', ') || NOT_AVAILABLE;
         const preservationText = getPreservationTerms(r.preservation_service).join(', ') || NOT_AVAILABLE;
-        const pidText = toValueList(r.pid_scheme).map(formatPidScheme).join(', ') || NOT_AVAILABLE;
+        const pidText = getPidSchemes(r.pid_scheme).map(formatPidScheme).join(', ') || NOT_AVAILABLE;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${r.title || NOT_AVAILABLE}</td>
