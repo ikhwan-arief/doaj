@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DOAJ Journals Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600;700&family=Source+Sans+Pro:wght@400;600;700&family=Source+Code+Pro:wght@500&display=swap" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+  <style>
+    :root {
+      --bg: #282624;           /* warm-black */
+      --card: #312f2d;         /* slightly lighter warm-black */
+      --muted: #F6F4F4;        /* light-grey */
+      --text: #ffffff;         /* white */
+      --accent: #FD5A3B;       /* grapefruit */
+      --accent-2: #FA9A87;     /* salmon */
+      --accent-3: #47A178;     /* mid-green */
+      --border: #5C5956;       /* dark-grey */
+      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Source Sans Pro', system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(253,90,59,0.10), transparent 35%),
+        radial-gradient(circle at 80% 0%, rgba(71,161,120,0.12), transparent 35%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 24px 28px 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: baseline;
+    }
+    h1 { margin: 0; font-size: 26px; letter-spacing: -0.4px; font-family: 'Spectral', 'Source Sans Pro', serif; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 18px;
+      padding: 0 28px 40px;
+    }
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .panel, .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+    .panel { padding: 18px; }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin: 0 28px 18px;
+    }
+    .card {
+      padding: 14px 16px;
+    }
+    .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .card .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
+    .filters h3 { margin: 0 0 12px; }
+    .filter-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    label { font-weight: 600; font-size: 14px; }
+    select, input, button {
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #24211f;
+      color: var(--text);
+      font-size: 14px;
+    }
+    input::placeholder { color: #6b7280; }
+    button {
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .charts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 14px;
+      padding: 0 28px;
+    }
+    .chart-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: var(--shadow);
+      min-height: 280px;
+    }
+    .table-box {
+      margin: 18px 28px 40px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-family: 'Source Sans Pro', system-ui, -apple-system, sans-serif; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; background: rgba(71,161,120,0.18); color: #c7f0de; }
+    .pill.negative { background: rgba(253,90,59,0.18); color: #ffd3c7; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; background: #22c55e; }
+    .status-banner {
+      margin: 0 28px 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(253, 90, 59, 0.12);
+      color: #ffe0d8;
+      font-size: 14px;
+    }
+    .status-banner.hidden { display: none; }
+    footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 0 30px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>DOAJ Journals Dashboard</h1>
+      <div class="muted">Live snapshot (hourly) from DOAJ API v4</div>
+    </div>
+    <div style="flex:1"></div>
+    <div class="muted" id="meta-info">Loading…</div>
+  </header>
+  <div id="status-banner" class="status-banner hidden"></div>
+
+  <div class="card-grid" id="kpi-cards">
+    <div class="card"><div class="label">Total Journals</div><div class="value" id="kpi-total">–</div></div>
+    <div class="card"><div class="label">Last Updated</div><div class="value" id="kpi-updated">–</div></div>
+    <div class="card"><div class="label">APC (Yes)</div><div class="value" id="kpi-apc">–</div></div>
+    <div class="card"><div class="label">Preservation (Yes)</div><div class="value" id="kpi-pres">–</div></div>
+    <div class="card"><div class="label">PID Scheme (Yes)</div><div class="value" id="kpi-pid">–</div></div>
+  </div>
+
+  <div class="layout">
+    <div class="panel filters">
+      <h3>Filters</h3>
+      <div class="filter-group">
+        <label for="country">Country</label>
+        <select id="country"><option value="">All</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="license">License Type</label>
+        <select id="license"><option value="">All</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="apc">APC</label>
+        <select id="apc">
+          <option value="">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="author-retains">Author Retains Copyright</label>
+        <select id="author-retains">
+          <option value="">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="preservation">Preservation</label>
+        <select id="preservation">
+          <option value="">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="pid">PID Scheme</label>
+        <select id="pid">
+          <option value="">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="publisher">Publisher (text)</label>
+        <input id="publisher" type="text" placeholder="contains…" />
+      </div>
+      <div class="filter-group">
+        <label for="subject">Subject (text)</label>
+        <input id="subject" type="text" placeholder="contains…" />
+      </div>
+      <div class="filter-group">
+        <label for="year-from">Created Year (from)</label>
+        <input id="year-from" type="number" min="1900" max="2100" placeholder="e.g., 2015" />
+      </div>
+      <div class="filter-group">
+        <label for="year-to">Created Year (to)</label>
+        <input id="year-to" type="number" min="1900" max="2100" placeholder="e.g., 2026" />
+      </div>
+      <button id="reset">Reset Filters</button>
+    </div>
+
+    <div class="charts">
+      <div class="chart-box" id="chart-country"></div>
+      <div class="chart-box" id="chart-license"></div>
+      <div class="chart-box" id="chart-apc"></div>
+      <div class="chart-box" id="chart-subjects"></div>
+      <div class="chart-box" id="chart-timeline"></div>
+    </div>
+  </div>
+
+  <div class="table-box">
+    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <h3 style="margin:0;">Journals (first 50 of filtered)</h3>
+      <div class="muted" id="table-count">–</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Publisher</th>
+          <th>Country</th>
+          <th>License</th>
+          <th>APC</th>
+          <th>Preservation</th>
+          <th>PID</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+
+  <footer>Metadata is CC0. Dashboard is built from hourly DOAJ API snapshots.</footer>
+
+  <script>
+    const state = {
+      records: [],
+      filtered: [],
+      aggregates: {},
+      meta: {}
+    };
+
+    function setStatus(message) {
+      const el = document.getElementById('status-banner');
+      if (!message) {
+        el.textContent = '';
+        el.classList.add('hidden');
+        return;
+      }
+      el.textContent = message;
+      el.classList.remove('hidden');
+    }
+
+    function formatNumber(n) {
+      return n === undefined || n === null ? "–" : n.toLocaleString();
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "–";
+      const d = new Date(iso);
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    async function loadJsonOrNull(path) {
+      try {
+        const res = await fetch(path, { cache: 'no-store' });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    async function loadData() {
+      const [journalsRes, aggRes, metaRes] = await Promise.all([
+        loadJsonOrNull('data/journals.json'),
+        loadJsonOrNull('data/aggregates.json'),
+        loadJsonOrNull('data/meta.json')
+      ]);
+
+      if (!Array.isArray(journalsRes) || journalsRes.length === 0) {
+        state.records = [];
+        state.filtered = [];
+        state.aggregates = aggRes || {};
+        state.meta = metaRes || {};
+        setStatus('Data is not available yet. Trigger the \"Fetch DOAJ journals (hourly)\" GitHub Action, then refresh this page.');
+        renderAll();
+        return;
+      }
+
+      state.records = journalsRes;
+      state.filtered = journalsRes;
+      state.aggregates = aggRes || {};
+      state.meta = metaRes || {};
+      setStatus('');
+      populateFilters();
+      renderAll();
+    }
+
+    function populateFilters() {
+      const countries = Array.from(new Set(state.records.map(r => r.country).filter(Boolean))).sort();
+      const licenses = Array.from(new Set(state.records.map(r => r.license_type).filter(Boolean))).sort();
+
+      const countrySelect = document.getElementById('country');
+      countrySelect.length = 1;
+      countries.forEach(c => {
+        const opt = document.createElement('option'); opt.value = c; opt.textContent = c; countrySelect.appendChild(opt);
+      });
+      const licenseSelect = document.getElementById('license');
+      licenseSelect.length = 1;
+      licenses.forEach(c => {
+        const opt = document.createElement('option'); opt.value = c; opt.textContent = c; licenseSelect.appendChild(opt);
+      });
+    }
+
+    function applyFilters() {
+      const country = document.getElementById('country').value;
+      const license = document.getElementById('license').value;
+      const apc = document.getElementById('apc').value;
+      const author = document.getElementById('author-retains').value;
+      const preservation = document.getElementById('preservation').value;
+      const pid = document.getElementById('pid').value;
+      const publisher = document.getElementById('publisher').value.trim().toLowerCase();
+      const subject = document.getElementById('subject').value.trim().toLowerCase();
+      const yearFrom = parseInt(document.getElementById('year-from').value, 10);
+      const yearTo = parseInt(document.getElementById('year-to').value, 10);
+
+      state.filtered = state.records.filter(r => {
+        if (country && r.country !== country) return false;
+        if (license && r.license_type !== license) return false;
+        if (apc === 'yes' && r.apc_has !== true) return false;
+        if (apc === 'no' && r.apc_has !== false) return false;
+        if (author === 'yes' && r.author_retains !== true) return false;
+        if (author === 'no' && r.author_retains !== false) return false;
+        if (preservation === 'yes' && r.preservation_has !== true) return false;
+        if (preservation === 'no' && r.preservation_has !== false) return false;
+        if (pid === 'yes' && r.pid_has !== true) return false;
+        if (pid === 'no' && r.pid_has !== false) return false;
+        if (publisher && !(r.publisher || '').toLowerCase().includes(publisher)) return false;
+        if (subject && !(r.subject_terms || []).some(s => s.toLowerCase().includes(subject))) return false;
+        if (!Number.isNaN(yearFrom) || !Number.isNaN(yearTo)) {
+          const dt = r.created_date ? new Date(r.created_date) : null;
+          if (dt) {
+            const y = dt.getUTCFullYear();
+            if (!Number.isNaN(yearFrom) && y < yearFrom) return false;
+            if (!Number.isNaN(yearTo) && y > yearTo) return false;
+          } else {
+            return false;
+          }
+        }
+        return true;
+      });
+      renderAll();
+    }
+
+    function resetFilters() {
+      document.querySelectorAll('.filters select, .filters input').forEach(el => el.value = '');
+      state.filtered = state.records;
+      renderAll();
+    }
+
+    function renderKPIs() {
+      document.getElementById('kpi-total').textContent = formatNumber(state.filtered.length);
+      document.getElementById('kpi-updated').textContent = formatDate(state.meta.source_last_updated_max || state.meta.fetched_at);
+      const apcYes = state.filtered.filter(r => r.apc_has === true).length;
+      document.getElementById('kpi-apc').textContent = formatNumber(apcYes);
+      const presYes = state.filtered.filter(r => r.preservation_has === true).length;
+      document.getElementById('kpi-pres').textContent = formatNumber(presYes);
+      const pidYes = state.filtered.filter(r => r.pid_has === true).length;
+      document.getElementById('kpi-pid').textContent = formatNumber(pidYes);
+      const metaText = `Fetched: ${formatDate(state.meta.fetched_at)} | Source last updated: ${formatDate(state.meta.source_last_updated_max)}`;
+      document.getElementById('meta-info').textContent = metaText;
+    }
+
+    function renderCharts() {
+      if (!state.filtered.length) {
+        renderEmptyCharts();
+        return;
+      }
+
+      // Country bar (top 12)
+      const countryCounts = {};
+      for (const r of state.filtered) if (r.country) countryCounts[r.country] = (countryCounts[r.country] || 0) + 1;
+      const topCountries = Object.entries(countryCounts).sort((a,b) => b[1]-a[1]).slice(0,12);
+      Plotly.newPlot('chart-country', [{type:'bar', x: topCountries.map(d=>d[0]), y: topCountries.map(d=>d[1]), marker:{color:'#3A5959'}}], {title:'Top countries', margin:{l:40,r:10,t:40,b:60}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
+
+      // License donut
+      const licCounts = {};
+      for (const r of state.filtered) if (r.license_type) licCounts[r.license_type] = (licCounts[r.license_type] || 0) + 1;
+      const licEntries = Object.entries(licCounts);
+      Plotly.newPlot('chart-license', [{type:'pie', hole:0.45, labels: licEntries.map(d=>d[0]), values: licEntries.map(d=>d[1]), marker:{colors:['#FD5A3B','#FA9A87','#47A178','#3A5959','#A3C386','#F9D950']}}], {title:'License mix', paper_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
+
+      // APC yes/no
+      const apcCounts = {yes:0, no:0, unknown:0};
+      for (const r of state.filtered) {
+        if (r.apc_has === true) apcCounts.yes++; else if (r.apc_has === false) apcCounts.no++; else apcCounts.unknown++;
+      }
+      Plotly.newPlot('chart-apc', [{type:'bar', x:['Yes','No','Unknown'], y:[apcCounts.yes, apcCounts.no, apcCounts.unknown], marker:{color:['#FD5A3B','#47A178','#5C5956']}}], {title:'APC presence', margin:{l:40,r:10,t:40,b:40}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
+
+      // Subjects top 12
+      const subjCounts = {};
+      for (const r of state.filtered) for (const s of (r.subject_terms || [])) subjCounts[s] = (subjCounts[s] || 0) + 1;
+      const subjTop = Object.entries(subjCounts).sort((a,b)=>b[1]-a[1]).slice(0,12);
+      Plotly.newPlot('chart-subjects', [{type:'bar', x: subjTop.map(d=>d[0]), y: subjTop.map(d=>d[1]), marker:{color:'#FA9A87'}}], {title:'Subjects (top 12)', margin:{l:40,r:10,t:40,b:120}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}, xaxis:{tickangle:-45}}, {displayModeBar:false});
+
+      // Timeline by created year
+      const yearCounts = {};
+      for (const r of state.filtered) {
+        if (r.created_date) {
+          const y = new Date(r.created_date).getUTCFullYear();
+          if (!Number.isNaN(y)) yearCounts[y] = (yearCounts[y] || 0) + 1;
+        }
+      }
+      const years = Object.keys(yearCounts).map(Number).sort((a,b)=>a-b);
+      Plotly.newPlot('chart-timeline', [{type:'scatter', mode:'lines+markers', x: years, y: years.map(y=>yearCounts[y]), line:{color:'#47A178'}}], {title:'Created year trend', margin:{l:40,r:10,t:40,b:40}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
+    }
+
+    function renderEmptyCharts() {
+      const ids = ['chart-country', 'chart-license', 'chart-apc', 'chart-subjects', 'chart-timeline'];
+      const titles = ['Top countries', 'License mix', 'APC presence', 'Subjects (top 12)', 'Created year trend'];
+      ids.forEach((id, i) => {
+        Plotly.newPlot(
+          id,
+          [],
+          {
+            title: titles[i],
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#F6F4F4' },
+            xaxis: { visible: false },
+            yaxis: { visible: false },
+            annotations: [{
+              text: 'No data yet',
+              showarrow: false,
+              xref: 'paper',
+              yref: 'paper',
+              x: 0.5,
+              y: 0.5,
+              font: { color: '#F6F4F4', size: 14 }
+            }]
+          },
+          { displayModeBar: false }
+        );
+      });
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+      const rows = state.filtered.slice(0, 50);
+      document.getElementById('table-count').textContent = `${rows.length} shown of ${state.filtered.length} filtered`;
+      if (!rows.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="8" class="muted">No journal data available yet.</td>';
+        tbody.appendChild(tr);
+        return;
+      }
+      for (const r of rows) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${r.title || '—'}</td>
+          <td>${r.publisher || '—'}</td>
+          <td>${r.country || '—'}</td>
+          <td>${r.license_type || '—'}</td>
+          <td>${r.apc_has === true ? '<span class="pill">Yes</span>' : r.apc_has === false ? '<span class="pill negative">No</span>' : '—'}</td>
+          <td>${r.preservation_has === true ? '<span class=\"pill\">Yes</span>' : r.preservation_has === false ? '<span class=\"pill negative\">No</span>' : '—'}</td>
+          <td>${r.pid_has === true ? '<span class=\"pill\">Yes</span>' : r.pid_has === false ? '<span class=\"pill negative\">No</span>' : '—'}</td>
+          <td>${formatDate(r.created_date)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function renderAll() {
+      renderKPIs();
+      renderCharts();
+      renderTable();
+    }
+
+    function wireEvents() {
+      document.querySelectorAll('.filters select, .filters input').forEach(el => {
+        el.addEventListener('change', applyFilters);
+        el.addEventListener('keyup', ev => { if (ev.key === 'Enter') applyFilters(); });
+      });
+      document.getElementById('reset').addEventListener('click', resetFilters);
+    }
+
+    async function init() {
+      try {
+        wireEvents();
+        await loadData();
+      } catch (err) {
+        console.error(err);
+        state.records = [];
+        state.filtered = [];
+        state.meta = {};
+        setStatus('Unable to load dashboard data. Check GitHub Actions logs and refresh.');
+        renderAll();
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
