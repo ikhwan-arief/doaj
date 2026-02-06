@@ -14,6 +14,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
@@ -77,7 +78,8 @@ def split_multi(value: Optional[str]) -> List[str]:
 
 
 def normalize_for_match(value: str) -> str:
-    normalized = re.sub(r"[^a-z0-9\s]", " ", value.lower())
+    folded = "".join(ch for ch in unicodedata.normalize("NFKD", value) if not unicodedata.combining(ch))
+    normalized = re.sub(r"[^a-z0-9\s]", " ", folded.lower())
     return re.sub(r"\s+", " ", normalized).strip()
 
 
@@ -88,7 +90,7 @@ def smart_title(value: str) -> str:
 
 
 def canonicalize_preservation_term(value: str) -> str:
-    cleaned = re.sub(r"\s+", " ", value.strip())
+    cleaned = re.sub(r"\s+", " ", value.strip()).strip(" .;,:-")
     if not cleaned:
         return ""
 
@@ -100,9 +102,11 @@ def canonicalize_preservation_term(value: str) -> str:
         (r"\bclockss\b", "CLOCKSS"),
         (r"\blockss\b", "LOCKSS"),
         (r"\bpkp\b.*\bpn\b|\bpkp preservation network\b", "PKP Preservation Network"),
+        (r"\bpkp\s*pln\b|\bpublic knowledge project pln\b", "PKP Preservation Network"),
         (r"\bportico\b", "Portico"),
         (r"\bpubmed central\b|\bpmc\b", "PubMed Central"),
         (r"\binternet archive\b", "Internet Archive"),
+        (r"\bweb archive\b|\barchive org\b", "Internet Archive"),
         (r"\bcariniana\b", "Cariniana Network"),
         (r"\bscholars?\s*portal\b", "Scholars Portal"),
         (
@@ -120,13 +124,22 @@ def canonicalize_preservation_term(value: str) -> str:
         (r"\bceeol\b", "CEEOL"),
         (r"\bcines\b", "CINES"),
         (r"\braco\b", "RACO"),
+        (r"\bscience\s*central\b", "Science Central"),
+        (r"\bkorea\s*med\b", "KoreaMed"),
+        (r"\beuro\s*pub\b", "Europub"),
+        (r"\bportal\s*garuda\b", "Garuda"),
+        (r"\bsynapse\b", "KoreaMed Synapse"),
         (r"\bscholar\b.*\bportal\b", "Scholars Portal"),
         (r"\buniversity computing centre srce\b", "Hrcak Portal of Croatian Scientific Journals"),
         (r"\bgoogle scholar\b", "Google Scholar"),
         (r"\bsid\b", "SID"),
         (r"\bniscpr online periodicals repository\b", "NIScPR Online Periodicals Repository"),
         (r"\bin[- ]?house archiving\b", "In-house Archiving"),
-        (r"\bjournal'?s?\s+website\b|\bjournal\s+website\b", "Journal Website"),
+        (
+            r"\bjournal'?s?\s+website\b|\bjournal\s+s?\s+website\b|\bjournal\s+website\b|"
+            r"\bwebsite of the journal\b|\barchived in the journal\b|\bissues of the journal\b",
+            "Journal Website",
+        ),
         (r"\bnational digital archives of iranian scholarly journals\b", "National Digital Archives of Iranian Scholarly Journals"),
         (r"\be\s*depot\b", "E-Depot"),
         (
@@ -138,6 +151,19 @@ def canonicalize_preservation_term(value: str) -> str:
     for pattern, canonical in aliases:
         if re.search(pattern, normalized):
             return canonical
+
+    if re.search(r"https?://|www\.", cleaned, flags=re.I):
+        url_aliases = [
+            (r"\bhrcak\b", "Hrcak Portal of Croatian Scientific Journals"),
+            (r"\belibrary\b|\bru\b", "eLIBRARY.RU"),
+            (r"\bkoreamed\b", "KoreaMed"),
+            (r"\bscholar\b", "Google Scholar"),
+            (r"\barchive\b|\bjournal\b|\brepository\b", "Journal Website"),
+        ]
+        for pattern, canonical in url_aliases:
+            if re.search(pattern, normalized):
+                return canonical
+        return "Journal Website"
 
     # Prefer expanded name inside parentheses when available.
     paren = re.search(r"\(([^)]+)\)", cleaned)
@@ -259,7 +285,7 @@ def canonicalize_peer_review_types(values: Sequence[str]) -> List[str]:
 
 
 def canonicalize_deposit_policy_term(value: str) -> str:
-    cleaned = re.sub(r"\s+", " ", value.strip())
+    cleaned = re.sub(r"\s+", " ", value.strip()).strip(" .;,:-")
     if not cleaned:
         return ""
 
@@ -272,31 +298,55 @@ def canonicalize_deposit_policy_term(value: str) -> str:
         (r"\bmir\s*bel\b|\bmirabel\b", "Mir@bel"),
         (r"\bmalena\b", "Malena"),
         (r"\baura\b", "AURA"),
-        (r"\bdergipark\b", "DergiPark"),
+        (r"\bdergi\s*park\b", "DergiPark"),
         (r"\bgaruda\b|\bgarba rujukan digital\b", "Garuda"),
         (
-            r"\bpulisher\b.*\b(site|website)\b|\bpublisher\b.*\bown\b.*\b(site|website)\b|\bpublisher\b.*\b(site|website)\b",
+            r"\b(publisher|publishers|pulisher|pulishers)\b.*\b(site|website)\b|"
+            r"\b(publisher|publishers|pulisher|pulishers)\b.*\bown\b.*\b(site|website)\b",
             "Publisher's own site",
         ),
         (r"\bjournal\b.*\bown\b.*\b(site|website)\b|\bjournal own website\b", "Journal's own site"),
         (r"\bjournal\b.*\b(site|website)\b", "Journal website"),
         (r"\bpreprint\b.*\bpostprint\b.*\bpolicy\b", "Preprint and postprint policy"),
+        (r"\bpre[- ]?print\b.*\bpost[- ]?print\b.*\bdeposition\b.*\bpolicy\b", "Preprint and postprint policy"),
         (r"\bself\b.*\barchiving\b", "Self-archiving policy"),
         (r"\brepository\b.*\bpolicy\b", "Repository policy"),
         (r"\bin[- ]?house\b.*\brepository\b", "In-house repository"),
         (r"\bcopyright\b", "Copyright notice"),
         (r"\bauthors?\b.*\brights?\b", "Authors' rights"),
+        (r"\bauthors?\b.*\bpersonal\b.*\binstitutional\b.*\brepositor", "Authors' personal and institutional repositories"),
+        (r"\binstruction(s)?\s+to\s+authors\b|\binstructions?\s+for\s+authors\b", "Instructions for authors"),
+        (r"\bopen access statement\b|\bopen access policy\b", "Open access policy"),
         (r"\binstitutional\b.*\brepository\b", "Institutional repository"),
         (r"\bbrill\b", "Brill.com"),
         (r"\bour own site\b", "Publisher's own site"),
         (r"\bpublic and\s+or commercial subject based repositories\b", "Public and/or commercial subject-based repositories"),
         (r"\bkarger permits authors of open access articles\b", "Karger policy statement"),
+        (r"\bvcgate\b", "VCgate"),
+        (r"\bvjol\b", "VJOL"),
+        (r"\bscpj\b", "SCPJ"),
+        (r"\bojs\s*/?\s*pkp\b", "OJS/PKP"),
+        (r"\blockss\b", "LOCKSS"),
         (r"\bcross\s*ref\b|\bcrossref\b", "CrossRef"),
     ]
 
     for pattern, canonical in aliases:
         if re.search(pattern, normalized):
             return canonical
+
+    if re.search(r"https?://|www\.", cleaned, flags=re.I):
+        url_aliases = [
+            (r"\bdergi\s*park\b", "DergiPark"),
+            (r"\bsherpa\b|\bromeo\b|\bopen policy finder\b", "Open Policy Finder"),
+            (r"\bcreative\s*commons\b", "Creative Commons"),
+            (r"\barxiv\b", "arXiv"),
+            (r"\bzenodo\b", "Zenodo"),
+            (r"\bfairsharing\b", "FAIRsharing"),
+        ]
+        for pattern, canonical in url_aliases:
+            if re.search(pattern, normalized):
+                return canonical
+        return "Journal website"
 
     if re.search(r"\bpublisher\b", normalized) and re.search(r"\b(site|website)\b", normalized):
         return "Publisher's own site"

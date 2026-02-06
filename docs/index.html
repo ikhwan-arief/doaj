@@ -345,7 +345,8 @@
     }
 
     function normalizeForMatch(value) {
-      return String(value).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      const folded = String(value).normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+      return folded.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
     function smartTitle(value) {
@@ -415,7 +416,7 @@
 
     function normalizePreservationTerm(value) {
       if (!value) return '';
-      const cleaned = String(value).replace(/\s+/g, ' ').trim();
+      const cleaned = String(value).replace(/\s+/g, ' ').trim().replace(/[ .;,:-]+$/g, '');
       if (!cleaned) return '';
       const normalized = normalizeForMatch(cleaned);
 
@@ -425,9 +426,11 @@
         { re: /\bclockss\b/, canonical: 'CLOCKSS' },
         { re: /\blockss\b/, canonical: 'LOCKSS' },
         { re: /\bpkp\b.*\bpn\b|\bpkp preservation network\b/, canonical: 'PKP Preservation Network' },
+        { re: /\bpkp\s*pln\b|\bpublic knowledge project pln\b/, canonical: 'PKP Preservation Network' },
         { re: /\bportico\b/, canonical: 'Portico' },
         { re: /\bpubmed central\b|\bpmc\b/, canonical: 'PubMed Central' },
         { re: /\binternet archive\b/, canonical: 'Internet Archive' },
+        { re: /\bweb archive\b|\barchive org\b/, canonical: 'Internet Archive' },
         { re: /\bcariniana\b/, canonical: 'Cariniana Network' },
         { re: /\bscholars?\s*portal\b/, canonical: 'Scholars Portal' },
         { re: /\bhrcak\b|\bhr cak\b|\bhr ak\b|portal of (croatian|scientific journals of croatia)/, canonical: 'Hrcak Portal of Croatian Scientific Journals' },
@@ -442,13 +445,18 @@
         { re: /\bceeol\b/, canonical: 'CEEOL' },
         { re: /\bcines\b/, canonical: 'CINES' },
         { re: /\braco\b/, canonical: 'RACO' },
+        { re: /\bscience\s*central\b/, canonical: 'Science Central' },
+        { re: /\bkorea\s*med\b/, canonical: 'KoreaMed' },
+        { re: /\beuro\s*pub\b/, canonical: 'Europub' },
+        { re: /\bportal\s*garuda\b/, canonical: 'Garuda' },
+        { re: /\bsynapse\b/, canonical: 'KoreaMed Synapse' },
         { re: /\bscholar\b.*\bportal\b/, canonical: 'Scholars Portal' },
         { re: /\buniversity computing centre srce\b/, canonical: 'Hrcak Portal of Croatian Scientific Journals' },
         { re: /\bgoogle scholar\b/, canonical: 'Google Scholar' },
         { re: /\bsid\b/, canonical: 'SID' },
         { re: /\bniscpr online periodicals repository\b/, canonical: 'NIScPR Online Periodicals Repository' },
         { re: /\bin[- ]?house archiving\b/, canonical: 'In-house Archiving' },
-        { re: /\bjournal'?s?\s+website\b|\bjournal\s+website\b/, canonical: 'Journal Website' },
+        { re: /\bjournal'?s?\s+website\b|\bjournal\s+s?\s+website\b|\bjournal\s+website\b|\bwebsite of the journal\b|\barchived in the journal\b|\bissues of the journal\b/, canonical: 'Journal Website' },
         { re: /\bnational digital archives of iranian scholarly journals\b/, canonical: 'National Digital Archives of Iranian Scholarly Journals' },
         { re: /\be\s*depot\b/, canonical: 'E-Depot' },
         { re: /\bnational library of the netherlands\b|\bkoninklijke bibliotheek\b|\bkb\b/, canonical: 'KB National Library of the Netherlands' }
@@ -456,6 +464,20 @@
 
       for (const alias of aliases) {
         if (alias.re.test(normalized)) return alias.canonical;
+      }
+
+      if (/https?:\/\/|www\./i.test(cleaned)) {
+        const urlAliases = [
+          { re: /\bhrcak\b/, canonical: 'Hrcak Portal of Croatian Scientific Journals' },
+          { re: /\belibrary\b|\bru\b/, canonical: 'eLIBRARY.RU' },
+          { re: /\bkoreamed\b/, canonical: 'KoreaMed' },
+          { re: /\bscholar\b/, canonical: 'Google Scholar' },
+          { re: /\barchive\b|\bjournal\b|\brepository\b/, canonical: 'Journal Website' }
+        ];
+        for (const alias of urlAliases) {
+          if (alias.re.test(normalized)) return alias.canonical;
+        }
+        return 'Journal Website';
       }
 
       const paren = cleaned.match(/\(([^)]+)\)/);
@@ -503,7 +525,7 @@
 
     function normalizeDepositPolicyTerm(value) {
       if (!value) return '';
-      const cleaned = String(value).replace(/\s+/g, ' ').trim();
+      const cleaned = String(value).replace(/\s+/g, ' ').trim().replace(/[ .;,:-]+$/g, '');
       if (!cleaned) return '';
       const normalized = normalizeForMatch(cleaned);
 
@@ -514,27 +536,51 @@
         { re: /\bmir\s*bel\b|\bmirabel\b/, canonical: 'Mir@bel' },
         { re: /\bmalena\b/, canonical: 'Malena' },
         { re: /\baura\b/, canonical: 'AURA' },
-        { re: /\bdergipark\b/, canonical: 'DergiPark' },
+        { re: /\bdergi\s*park\b/, canonical: 'DergiPark' },
         { re: /\bgaruda\b|\bgarba rujukan digital\b/, canonical: 'Garuda' },
-        { re: /\bpulisher\b.*\b(site|website)\b|\bpublisher\b.*\bown\b.*\b(site|website)\b|\bpublisher\b.*\b(site|website)\b/, canonical: "Publisher's own site" },
+        { re: /\b(publisher|publishers|pulisher|pulishers)\b.*\b(site|website)\b|\b(publisher|publishers|pulisher|pulishers)\b.*\bown\b.*\b(site|website)\b/, canonical: "Publisher's own site" },
         { re: /\bjournal\b.*\bown\b.*\b(site|website)\b|\bjournal own website\b/, canonical: "Journal's own site" },
         { re: /\bjournal\b.*\b(site|website)\b/, canonical: 'Journal website' },
         { re: /\bpreprint\b.*\bpostprint\b.*\bpolicy\b/, canonical: 'Preprint and postprint policy' },
+        { re: /\bpre[- ]?print\b.*\bpost[- ]?print\b.*\bdeposition\b.*\bpolicy\b/, canonical: 'Preprint and postprint policy' },
         { re: /\bself\b.*\barchiving\b/, canonical: 'Self-archiving policy' },
         { re: /\brepository\b.*\bpolicy\b/, canonical: 'Repository policy' },
         { re: /\bin[- ]?house\b.*\brepository\b/, canonical: 'In-house repository' },
         { re: /\bcopyright\b/, canonical: 'Copyright notice' },
         { re: /\bauthors?\b.*\brights?\b/, canonical: "Authors' rights" },
+        { re: /\bauthors?\b.*\bpersonal\b.*\binstitutional\b.*\brepositor/, canonical: "Authors' personal and institutional repositories" },
+        { re: /\binstruction(s)?\s+to\s+authors\b|\binstructions?\s+for\s+authors\b/, canonical: 'Instructions for authors' },
+        { re: /\bopen access statement\b|\bopen access policy\b/, canonical: 'Open access policy' },
         { re: /\binstitutional\b.*\brepository\b/, canonical: 'Institutional repository' },
         { re: /\bbrill\b/, canonical: 'Brill.com' },
         { re: /\bour own site\b/, canonical: "Publisher's own site" },
         { re: /\bpublic and\s+or commercial subject based repositories\b/, canonical: 'Public and/or commercial subject-based repositories' },
         { re: /\bkarger permits authors of open access articles\b/, canonical: 'Karger policy statement' },
+        { re: /\bvcgate\b/, canonical: 'VCgate' },
+        { re: /\bvjol\b/, canonical: 'VJOL' },
+        { re: /\bscpj\b/, canonical: 'SCPJ' },
+        { re: /\bojs\s*\/?\s*pkp\b/, canonical: 'OJS/PKP' },
+        { re: /\blockss\b/, canonical: 'LOCKSS' },
         { re: /\bcross\s*ref\b|\bcrossref\b/, canonical: 'CrossRef' }
       ];
 
       for (const alias of aliases) {
         if (alias.re.test(normalized)) return alias.canonical;
+      }
+
+      if (/https?:\/\/|www\./i.test(cleaned)) {
+        const urlAliases = [
+          { re: /\bdergi\s*park\b/, canonical: 'DergiPark' },
+          { re: /\bsherpa\b|\bromeo\b|\bopen policy finder\b/, canonical: 'Open Policy Finder' },
+          { re: /\bcreative\s*commons\b/, canonical: 'Creative Commons' },
+          { re: /\barxiv\b/, canonical: 'arXiv' },
+          { re: /\bzenodo\b/, canonical: 'Zenodo' },
+          { re: /\bfairsharing\b/, canonical: 'FAIRsharing' }
+        ];
+        for (const alias of urlAliases) {
+          if (alias.re.test(normalized)) return alias.canonical;
+        }
+        return 'Journal website';
       }
       if (/\bpublisher\b/.test(normalized) && /\b(site|website)\b/.test(normalized)) return "Publisher's own site";
       if (/\bjournal\b/.test(normalized) && /\b(site|website)\b/.test(normalized)) return 'Journal website';
