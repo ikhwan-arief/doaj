@@ -1328,7 +1328,7 @@
         const articleCell = document.createElement('td');
         const articleValue = getArticleRecords(record);
         articleCell.textContent = articleValue === null ? NOT_AVAILABLE : formatNumber(articleValue);
-        if (isOverOneMonth(record)) {
+        if (articleValue === 0 && isOverOneMonth(record)) {
           const overTag = document.createElement('span');
           overTag.className = 'pill warn';
           overTag.textContent = 'Over 1 month';
