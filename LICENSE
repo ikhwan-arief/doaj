@@ -1,14 +1,31 @@
 Copyright (c) 2026 Ikhwan Arief, Universitas Andalas.
 
-This repository is licensed under the Creative Commons
-Attribution-NonCommercial-ShareAlike 4.0 International license
-(CC BY-NC-SA 4.0).
+This repository uses a dual-license model.
 
-You may share and adapt this work with attribution for non-commercial
-purposes only, and adaptations must be distributed under the same license.
+1) Software code license
+   Applies to source code files, including:
+   - scripts/**
+   - .github/workflows/**
+   - code sections in docs/index.html
+   License: PolyForm Noncommercial 1.0.0
+   Full legal text: https://polyformproject.org/licenses/noncommercial/1.0.0/
+   See also: LICENSE-CODE.md
 
-License deed:
-https://creativecommons.org/licenses/by-nc-sa/4.0/
+2) Content and documentation license
+   Applies to non-code content and documentation, including:
+   - README.md
+   - narrative/documentation text
+   - design/content text shown in the dashboard UI
+   License: CC BY-NC-SA 4.0
+   Deed: https://creativecommons.org/licenses/by-nc-sa/4.0/
+   Legal code: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+   See also: LICENSE-CONTENT.md
 
-Legal code:
-https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+3) Third-party source data note
+   Data sourced from DOAJ public dump (docs/data/**) follows DOAJ public
+   data terms (CC0):
+   https://doaj.org/docs/public-data-dump/
+   https://creativecommons.org/publicdomain/zero/1.0/
+
+If a file includes an explicit license header, that header controls for that file.
+When in doubt, refer to the full legal texts linked above.

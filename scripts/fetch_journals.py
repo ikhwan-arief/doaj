@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Ikhwan Arief, Universitas Andalas.
-# License: CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/).
-# Commercial use is not permitted. Adaptations must keep the same license.
+# Code license: PolyForm Noncommercial 1.0.0
+# https://polyformproject.org/licenses/noncommercial/1.0.0/
+# See LICENSE and LICENSE-CODE.md
 """Fetch DOAJ journal CSV and write normalized snapshots for the dashboard.
 
 Outputs:

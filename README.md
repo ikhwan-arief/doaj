@@ -119,10 +119,26 @@ git clone <bundle-file-path> restored-repo
 
 - This project currently uses the CSV source only (no DOAJ API key needed).
 - Exchange rates for APC conversion are loaded live in the browser when the page opens.
+  - Primary: Frankfurter API (`https://www.frankfurter.app/`)
+  - Fallback: open.er-api.com (`https://open.er-api.com/`)
 - If data appears stale, re-run fetch and deploy workflows, then refresh the page.
 
 ## License
 
-Repository code/content license: CC BY-NC-SA 4.0  
-See `LICENSE`.
+This repository uses dual licensing:
 
+- Code (`scripts/**`, `.github/workflows/**`, code in `docs/index.html`):  
+  PolyForm Noncommercial 1.0.0  
+  https://polyformproject.org/licenses/noncommercial/1.0.0/  
+  See `LICENSE-CODE.md`
+
+- Content/documentation (including this README and narrative UI text):  
+  CC BY-NC-SA 4.0  
+  https://creativecommons.org/licenses/by-nc-sa/4.0/  
+  See `LICENSE-CONTENT.md`
+
+- Source dataset in `docs/data/**` is derived from DOAJ public dump (CC0):  
+  https://doaj.org/docs/public-data-dump/  
+  https://creativecommons.org/publicdomain/zero/1.0/
+
+For repository-wide details, see `LICENSE`.

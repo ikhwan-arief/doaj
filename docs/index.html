@@ -1,8 +1,11 @@
 <!doctype html>
 <!--
   Copyright (c) 2026 Ikhwan Arief, Universitas Andalas.
-  License: CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/).
-  Commercial use is not permitted. Adaptations must keep the same license.
+  Code license: PolyForm Noncommercial 1.0.0
+  https://polyformproject.org/licenses/noncommercial/1.0.0/
+  Content/license text in this dashboard UI: CC BY-NC-SA 4.0
+  https://creativecommons.org/licenses/by-nc-sa/4.0/
+  See LICENSE, LICENSE-CODE.md, and LICENSE-CONTENT.md.
 -->
 <html lang="en">
 <head>
@@ -575,6 +578,9 @@
   <footer class="site-footer">
     <div class="footer-row">
       <div>&copy; Ikhwan Arief, Universitas Andalas. <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a>. Data source: <a href="https://doaj.org/docs/public-data-dump/" target="_blank" rel="noopener noreferrer">DOAJ</a></div>
+    </div>
+    <div class="footer-row footer-source" id="fx-source-note">
+      <div>Exchange-rate sources: <a href="https://www.frankfurter.app/" target="_blank" rel="noopener noreferrer">Frankfurter API</a> (primary), <a href="https://open.er-api.com/" target="_blank" rel="noopener noreferrer">open.er-api.com</a> (fallback)</div>
     </div>
   </footer>
 
@@ -1793,6 +1799,29 @@
       return false;
     }
 
+    function renderFxSourceNote() {
+      const el = document.getElementById('fx-source-note');
+      if (!el) return;
+
+      const defaultHtml = 'Exchange-rate sources: <a href="https://www.frankfurter.app/" target="_blank" rel="noopener noreferrer">Frankfurter API</a> (primary), <a href="https://open.er-api.com/" target="_blank" rel="noopener noreferrer">open.er-api.com</a> (fallback)';
+      if (!state.fxSource) {
+        el.innerHTML = `<div>${defaultHtml}</div>`;
+        return;
+      }
+
+      let activeName = state.fxSource;
+      let activeUrl = state.fxSource;
+      if (state.fxSource.includes('frankfurter.app')) {
+        activeName = 'Frankfurter API';
+        activeUrl = 'https://www.frankfurter.app/';
+      } else if (state.fxSource.includes('open.er-api.com')) {
+        activeName = 'open.er-api.com';
+        activeUrl = 'https://open.er-api.com/';
+      }
+
+      el.innerHTML = `<div>Exchange-rate source (active): <a href="${activeUrl}" target="_blank" rel="noopener noreferrer">${activeName}</a></div>`;
+    }
+
     function populateFilters() {
       const countries = Array.from(new Set(state.records.map(r => r.country).filter(Boolean)))
         .sort((a, b) => formatCountry(a).localeCompare(formatCountry(b)));
@@ -1930,6 +1959,7 @@
 
       const metaText = `Source last updated: ${formatDate(state.meta.source_last_updated_max)}`;
       document.getElementById('meta-info').textContent = metaText;
+      renderFxSourceNote();
     }
 
     function getMapPlotConfig() {
