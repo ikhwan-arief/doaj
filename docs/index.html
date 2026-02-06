@@ -295,6 +295,157 @@
     const countryNameFormatter = (typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined')
       ? new Intl.DisplayNames([navigator.language || 'en', 'en'], { type: 'region' })
       : null;
+    const CONTINENT_COLORS = {
+      'Africa': '#47A178',
+      'Asia': '#FD5A3B',
+      'Europe': '#3A5959',
+      'North America': '#A3C386',
+      'South America': '#F9D950',
+      'Oceania': '#982E0A',
+      'Other': '#5C5956'
+    };
+    const COUNTRY_TO_CONTINENT = {
+      'Afghanistan': 'Asia',
+      'Albania': 'Europe',
+      'Algeria': 'Africa',
+      'Angola': 'Africa',
+      'Argentina': 'South America',
+      'Armenia': 'Asia',
+      'Australia': 'Oceania',
+      'Austria': 'Europe',
+      'Azerbaijan': 'Asia',
+      'Bahrain': 'Asia',
+      'Bangladesh': 'Asia',
+      'Barbados': 'North America',
+      'Belarus': 'Europe',
+      'Belgium': 'Europe',
+      'Bhutan': 'Asia',
+      'Bolivia, Plurinational State of': 'South America',
+      'Bosnia and Herzegovina': 'Europe',
+      'Brazil': 'South America',
+      'Brunei Darussalam': 'Asia',
+      'Bulgaria': 'Europe',
+      'Burkina Faso': 'Africa',
+      'Cameroon': 'Africa',
+      'Canada': 'North America',
+      'Chile': 'South America',
+      'China': 'Asia',
+      'Colombia': 'South America',
+      'Congo, The Democratic Republic of the': 'Africa',
+      'Costa Rica': 'North America',
+      'Croatia': 'Europe',
+      'Cuba': 'North America',
+      'Cyprus': 'Asia',
+      'Czechia': 'Europe',
+      "Côte d'Ivoire": 'Africa',
+      'Denmark': 'Europe',
+      'Dominican Republic': 'North America',
+      'Ecuador': 'South America',
+      'Egypt': 'Africa',
+      'El Salvador': 'North America',
+      'Estonia': 'Europe',
+      'Ethiopia': 'Africa',
+      'Finland': 'Europe',
+      'France': 'Europe',
+      'Gabon': 'Africa',
+      'Gambia': 'Africa',
+      'Georgia': 'Asia',
+      'Germany': 'Europe',
+      'Ghana': 'Africa',
+      'Greece': 'Europe',
+      'Guam': 'Oceania',
+      'Guatemala': 'North America',
+      'Honduras': 'North America',
+      'Hong Kong': 'Asia',
+      'Hungary': 'Europe',
+      'Iceland': 'Europe',
+      'India': 'Asia',
+      'Indonesia': 'Asia',
+      'Iran, Islamic Republic of': 'Asia',
+      'Iraq': 'Asia',
+      'Ireland': 'Europe',
+      'Israel': 'Asia',
+      'Italy': 'Europe',
+      'Japan': 'Asia',
+      'Jordan': 'Asia',
+      'Kazakhstan': 'Asia',
+      'Kenya': 'Africa',
+      'Korea, Republic of': 'Asia',
+      'Kosovo': 'Europe',
+      'Kuwait': 'Asia',
+      'Kyrgyzstan': 'Asia',
+      'Latvia': 'Europe',
+      'Lebanon': 'Asia',
+      'Libya': 'Africa',
+      'Lithuania': 'Europe',
+      'Luxembourg': 'Europe',
+      'Malawi': 'Africa',
+      'Malaysia': 'Asia',
+      'Mali': 'Africa',
+      'Malta': 'Europe',
+      'Mauritius': 'Africa',
+      'Mexico': 'North America',
+      'Moldova, Republic of': 'Europe',
+      'Mongolia': 'Asia',
+      'Montenegro': 'Europe',
+      'Morocco': 'Africa',
+      'Nepal': 'Asia',
+      'Netherlands': 'Europe',
+      'New Zealand': 'Oceania',
+      'Nicaragua': 'North America',
+      'Niger': 'Africa',
+      'Nigeria': 'Africa',
+      'North Macedonia': 'Europe',
+      'Norway': 'Europe',
+      'Oman': 'Asia',
+      'Pakistan': 'Asia',
+      'Palestine, State of': 'Asia',
+      'Panama': 'North America',
+      'Paraguay': 'South America',
+      'Peru': 'South America',
+      'Philippines': 'Asia',
+      'Poland': 'Europe',
+      'Portugal': 'Europe',
+      'Puerto Rico': 'North America',
+      'Qatar': 'Asia',
+      'Romania': 'Europe',
+      'Russian Federation': 'Europe',
+      'Rwanda': 'Africa',
+      'Saudi Arabia': 'Asia',
+      'Senegal': 'Africa',
+      'Serbia': 'Europe',
+      'Singapore': 'Asia',
+      'Slovakia': 'Europe',
+      'Slovenia': 'Europe',
+      'South Africa': 'Africa',
+      'South Sudan': 'Africa',
+      'Spain': 'Europe',
+      'Sri Lanka': 'Asia',
+      'Sweden': 'Europe',
+      'Switzerland': 'Europe',
+      'Syrian Arab Republic': 'Asia',
+      'Taiwan, Province of China': 'Asia',
+      'Tajikistan': 'Asia',
+      'Tanzania, United Republic of': 'Africa',
+      'Thailand': 'Asia',
+      'Timor-Leste': 'Asia',
+      'Togo': 'Africa',
+      'Trinidad and Tobago': 'North America',
+      'Tunisia': 'Africa',
+      'Türkiye': 'Asia',
+      'Uganda': 'Africa',
+      'Ukraine': 'Europe',
+      'United Arab Emirates': 'Asia',
+      'United Kingdom': 'Europe',
+      'United States': 'North America',
+      'Uruguay': 'South America',
+      'Uzbekistan': 'Asia',
+      'Venezuela, Bolivarian Republic of': 'South America',
+      'Viet Nam': 'Asia',
+      'Yemen': 'Asia',
+      'Zimbabwe': 'Africa',
+      'Åland Islands': 'Europe'
+    };
 
     function setStatus(message) {
       const el = document.getElementById('status-banner');
@@ -623,6 +774,11 @@
       if (!text) return '—';
       const value = String(text);
       return value.length <= maxLen ? value : `${value.slice(0, maxLen - 3)}...`;
+    }
+
+    function getContinent(country) {
+      if (!country) return 'Other';
+      return COUNTRY_TO_CONTINENT[country] || 'Other';
     }
 
     function getCreatedYear(record) {
@@ -1024,27 +1180,54 @@
 
       const mapEntries = sortedEntries(countryCounts);
       const maxCountryCount = Math.max(...mapEntries.map(([, count]) => count), 1);
-      Plotly.newPlot(
-        'chart-country-map',
-        [{
+      const continentCounts = {};
+      const continentBuckets = {};
+      for (const [country, count] of mapEntries) {
+        const continent = getContinent(country);
+        continentCounts[continent] = (continentCounts[continent] || 0) + count;
+        if (!continentBuckets[continent]) continentBuckets[continent] = [];
+        continentBuckets[continent].push([country, count]);
+      }
+      const continentOrder = Object.entries(continentCounts).sort((a, b) => b[1] - a[1]).map(([name]) => name);
+      const mapTraces = continentOrder.map(continent => {
+        const entries = continentBuckets[continent] || [];
+        return {
           type: 'scattergeo',
           mode: 'markers',
           locationmode: 'country names',
-          locations: mapEntries.map(([country]) => formatCountry(country)),
-          text: mapEntries.map(([country, count]) => `${formatCountry(country)}: ${formatNumber(count)} journals`),
+          name: `${continent} (${formatNumber(continentCounts[continent])})`,
+          locations: entries.map(([country]) => formatCountry(country)),
+          text: entries.map(([country, count]) => `${formatCountry(country)}: ${formatNumber(count)} journals`),
           hovertemplate: '%{text}<extra></extra>',
           marker: {
-            color: '#47A178',
-            opacity: 0.75,
+            color: CONTINENT_COLORS[continent] || CONTINENT_COLORS.Other,
+            opacity: 0.78,
             line: { color: '#282624', width: 0.5 },
-            size: mapEntries.map(([, count]) => 8 + Math.sqrt(count / maxCountryCount) * 34)
+            size: entries.map(([, count]) => 8 + Math.sqrt(count / maxCountryCount) * 34)
           }
-        }],
+        };
+      });
+
+      Plotly.newPlot(
+        'chart-country-map',
+        mapTraces,
         {
-          title: 'Country of publishers (bubble size = journals)',
-          margin: { l: 10, r: 10, t: 46, b: 10 },
+          title: 'Country of Publishers',
+          margin: { l: 10, r: 210, t: 46, b: 10 },
           paper_bgcolor: 'rgba(0,0,0,0)',
+          legend: {
+            x: 1.02,
+            y: 1,
+            xanchor: 'left',
+            yanchor: 'top',
+            bgcolor: 'rgba(255,255,255,0.85)',
+            bordercolor: '#D7D2CE',
+            borderwidth: 1,
+            font: { color: '#282624', size: 12 },
+            title: { text: 'Continents' }
+          },
           geo: {
+            domain: { x: [0, 0.79], y: [0, 1] },
             showframe: false,
             showcoastlines: true,
             coastlinecolor: '#D7D2CE',
@@ -1077,7 +1260,7 @@
         'chart-country-map',
         [],
         {
-          title: 'Country of publishers (bubble size = journals)',
+          title: 'Country of Publishers',
           paper_bgcolor: 'rgba(0,0,0,0)',
           geo: { showframe: false, showcoastlines: true, showcountries: true, showland: true },
           annotations: [{ text: 'No data yet', showarrow: false, x: 0.5, y: 0.5, xref: 'paper', yref: 'paper' }]
