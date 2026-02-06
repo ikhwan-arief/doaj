@@ -219,6 +219,7 @@
     .pill.warn { background: rgba(152,46,10,0.18); color: #982E0A; margin-left: 6px; }
     .table-link { color: #982E0A; text-decoration: none; font-weight: 600; }
     .table-link:hover { text-decoration: underline; }
+    .country-text { font-weight: 700; }
     .table-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
     .table-search { margin: 8px 0 10px; max-width: 520px; }
     .table-search label { display: block; margin-bottom: 4px; }
@@ -235,6 +236,14 @@
     }
     .table-nav button:disabled { opacity: 0.5; cursor: not-allowed; }
     .table-page { font-size: 13px; color: var(--muted); min-width: 108px; text-align: center; }
+    .table-footer {
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
     .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; background: #22c55e; }
     .status-banner {
       margin: 0 28px 14px;
@@ -304,6 +313,7 @@
       .table-toolbar { align-items: flex-start; }
       .table-nav { width: 100%; justify-content: space-between; }
       .table-page { min-width: 0; }
+      .table-footer { align-items: flex-start; }
       .site-footer { padding: 16px 20px 24px; font-size: 11.5px; }
       .footer-row { flex-direction: column; align-items: flex-start; gap: 6px; }
       select, input, button { font-size: 15px; }
@@ -450,12 +460,6 @@
   <div class="table-box">
     <div class="table-toolbar">
       <h3 style="margin:0;">Journals</h3>
-      <div class="table-nav">
-        <button id="table-prev" type="button">Prev</button>
-        <span class="table-page" id="table-page">Page 1 of 1</span>
-        <button id="table-next" type="button">Next</button>
-      </div>
-      <div class="muted" id="table-count">–</div>
     </div>
     <div class="table-search">
       <label for="search-query">Search (title, country, subject)</label>
@@ -476,6 +480,14 @@
       </thead>
       <tbody id="table-body"></tbody>
     </table>
+    <div class="table-footer">
+      <div class="muted" id="table-count">–</div>
+      <div class="table-nav">
+        <button id="table-prev" type="button">Prev</button>
+        <span class="table-page" id="table-page">Page 1 of 1</span>
+        <button id="table-next" type="button">Next</button>
+      </div>
+    </div>
   </div>
 
   <footer class="site-footer">
@@ -991,6 +1003,13 @@
     function getContinent(country) {
       if (!country) return 'Other';
       return COUNTRY_TO_CONTINENT[country] || 'Other';
+    }
+
+    function getCountryContinent(country) {
+      const direct = getContinent(country);
+      if (direct !== 'Other') return direct;
+      const formatted = formatCountry(country);
+      return getContinent(formatted);
     }
 
     function getCreatedYear(record) {
@@ -1940,7 +1959,11 @@
         tr.appendChild(titleCell);
 
         const countryCell = document.createElement('td');
-        countryCell.textContent = formatCountry(record.country);
+        const countryName = formatCountry(record.country);
+        countryCell.textContent = countryName;
+        countryCell.className = 'country-text';
+        const countryContinent = getCountryContinent(record.country);
+        countryCell.style.color = CONTINENT_COLORS[countryContinent] || CONTINENT_COLORS.Other;
         tr.appendChild(countryCell);
 
         const subjectCell = document.createElement('td');
