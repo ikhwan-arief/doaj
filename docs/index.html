@@ -196,14 +196,32 @@
         </select>
       </div>
       <div class="filter-group">
+        <label for="peer-review">Peer Review Type</label>
+        <select id="peer-review">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="filter-group">
         <label for="preservation">Preservation</label>
         <select id="preservation">
           <option value="">All</option>
         </select>
       </div>
       <div class="filter-group">
+        <label for="deposit-policy">Deposit Policy Directory</label>
+        <select id="deposit-policy">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="filter-group">
         <label for="pid">PID Scheme</label>
         <select id="pid">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="language">Languages</label>
+        <select id="language">
           <option value="">All</option>
         </select>
       </div>
@@ -309,6 +327,21 @@
       if (!text) return [];
       const parts = text.split(/[|;,\n]+/).map(part => part.trim()).filter(Boolean);
       return [...new Set(parts)];
+    }
+
+    function normalizeSimpleTerm(value) {
+      if (!value) return '';
+      const cleaned = String(value).replace(/\s+/g, ' ').trim();
+      if (!cleaned) return '';
+      if (cleaned === cleaned.toLowerCase() || cleaned === cleaned.toUpperCase()) {
+        return titleCase(cleaned);
+      }
+      return cleaned;
+    }
+
+    function getSimpleTerms(value) {
+      const terms = toValueList(value).map(normalizeSimpleTerm).filter(Boolean);
+      return [...new Set(terms)];
     }
 
     function formatPidScheme(value) {
@@ -528,9 +561,15 @@
         .sort((a, b) => formatCountry(a).localeCompare(formatCountry(b)));
       const licenses = Array.from(new Set(state.records.flatMap(r => toValueList(r.license_type))))
         .sort((a, b) => String(a).localeCompare(String(b)));
+      const peerReviews = Array.from(new Set(state.records.flatMap(r => getSimpleTerms(r.peer_review_type))))
+        .sort((a, b) => String(a).localeCompare(String(b)));
       const preservations = Array.from(new Set(state.records.flatMap(r => getPreservationTerms(r.preservation_service))))
         .sort((a, b) => String(a).localeCompare(String(b)));
+      const depositPolicyDirectories = Array.from(new Set(state.records.flatMap(r => getSimpleTerms(r.deposit_policy_directory))))
+        .sort((a, b) => String(a).localeCompare(String(b)));
       const pidSchemes = Array.from(new Set(state.records.flatMap(r => getPidSchemes(r.pid_scheme))))
+        .sort((a, b) => String(a).localeCompare(String(b)));
+      const languages = Array.from(new Set(state.records.flatMap(r => getSimpleTerms(r.language))))
         .sort((a, b) => String(a).localeCompare(String(b)));
 
       const countrySelect = document.getElementById('country');
@@ -547,6 +586,15 @@
         const opt = document.createElement('option'); opt.value = c; opt.textContent = c; licenseSelect.appendChild(opt);
       });
 
+      const peerReviewSelect = document.getElementById('peer-review');
+      peerReviewSelect.length = 1;
+      peerReviews.forEach(review => {
+        const opt = document.createElement('option');
+        opt.value = review;
+        opt.textContent = review;
+        peerReviewSelect.appendChild(opt);
+      });
+
       const preservationSelect = document.getElementById('preservation');
       preservationSelect.length = 1;
       preservations.forEach(service => {
@@ -554,6 +602,15 @@
         opt.value = service;
         opt.textContent = service;
         preservationSelect.appendChild(opt);
+      });
+
+      const depositPolicySelect = document.getElementById('deposit-policy');
+      depositPolicySelect.length = 1;
+      depositPolicyDirectories.forEach(directory => {
+        const opt = document.createElement('option');
+        opt.value = directory;
+        opt.textContent = directory;
+        depositPolicySelect.appendChild(opt);
       });
 
       const pidSelect = document.getElementById('pid');
@@ -565,6 +622,15 @@
         pidSelect.appendChild(opt);
       });
 
+      const languageSelect = document.getElementById('language');
+      languageSelect.length = 1;
+      languages.forEach(language => {
+        const opt = document.createElement('option');
+        opt.value = language;
+        opt.textContent = language;
+        languageSelect.appendChild(opt);
+      });
+
       setupYearRange();
     }
 
@@ -573,8 +639,11 @@
       const license = document.getElementById('license').value;
       const apc = document.getElementById('apc').value;
       const author = document.getElementById('author-retains').value;
+      const peerReview = document.getElementById('peer-review').value;
       const preservation = document.getElementById('preservation').value;
+      const depositPolicy = document.getElementById('deposit-policy').value;
       const pid = document.getElementById('pid').value;
+      const language = document.getElementById('language').value;
       const publisher = document.getElementById('publisher').value.trim().toLowerCase();
       const subject = document.getElementById('subject').value.trim().toLowerCase();
       const yearFrom = parseInt(document.getElementById('year-from').value, 10);
@@ -587,8 +656,11 @@
         if (apc === 'no' && r.apc_has !== false) return false;
         if (author === 'yes' && r.author_retains !== true) return false;
         if (author === 'no' && r.author_retains !== false) return false;
+        if (peerReview && !getSimpleTerms(r.peer_review_type).includes(peerReview)) return false;
         if (preservation && !getPreservationTerms(r.preservation_service).includes(preservation)) return false;
+        if (depositPolicy && !getSimpleTerms(r.deposit_policy_directory).includes(depositPolicy)) return false;
         if (pid && !getPidSchemes(r.pid_scheme).includes(pid)) return false;
+        if (language && !getSimpleTerms(r.language).includes(language)) return false;
         if (publisher && !(r.publisher || '').toLowerCase().includes(publisher)) return false;
         if (subject && !(r.subject_terms || []).some(s => s.toLowerCase().includes(subject))) return false;
         if (state.yearBounds && !Number.isNaN(yearFrom) && !Number.isNaN(yearTo)) {
@@ -657,15 +729,33 @@
         {displayModeBar:false}
       );
 
-      // License donut
+      // License mix (horizontal)
       const licCounts = {};
       for (const r of state.filtered) {
         for (const lic of toValueList(r.license_type)) {
           licCounts[lic] = (licCounts[lic] || 0) + 1;
         }
       }
-      const licEntries = Object.entries(licCounts);
-      Plotly.newPlot('chart-license', [{type:'pie', hole:0.45, labels: licEntries.map(d=>d[0]), values: licEntries.map(d=>d[1]), marker:{colors:['#FD5A3B','#FA9A87','#47A178','#3A5959','#A3C386','#F9D950']}}], {title:'License mix', paper_bgcolor:'rgba(0,0,0,0)', font:{color:'#282624'}}, {displayModeBar:false});
+      const licEntries = Object.entries(licCounts).sort((a, b) => b[1] - a[1]).slice(0, 12);
+      Plotly.newPlot(
+        'chart-license',
+        [{
+          type:'bar',
+          orientation:'h',
+          x: licEntries.map(d => d[1]).reverse(),
+          y: licEntries.map(d => shortLabel(d[0], 52)).reverse(),
+          marker:{color:'#FD5A3B'}
+        }],
+        {
+          title:'License mix',
+          margin:{l:280,r:12,t:46,b:48},
+          paper_bgcolor:'rgba(0,0,0,0)',
+          plot_bgcolor:'rgba(0,0,0,0)',
+          font:{color:'#282624'},
+          yaxis:{automargin:true}
+        },
+        {displayModeBar:false}
+      );
 
       // APC yes/no (pie)
       const apcCounts = {yes:0, no:0};

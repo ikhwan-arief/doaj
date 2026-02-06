@@ -294,7 +294,8 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
 
     preservation_services = canonicalize_preservation_services(
         split_multi(
-        get_value(row, lookup, ["preservationservice", "preservationservices", "digitalarchivingpolicy"])
+            # Use only the "Preservation Services" CSV column (not national library).
+            get_value(row, lookup, ["preservationservices"])
         )
     )
     pid_schemes = canonicalize_pid_schemes(
@@ -323,6 +324,8 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
         )
     )
     languages = split_multi(get_value(row, lookup, ["language", "journallanguage"]))
+    peer_review_type = split_multi(get_value(row, lookup, ["reviewprocess"]))
+    deposit_policy_directory = split_multi(get_value(row, lookup, ["depositpolicydirectory"]))
     keywords = split_multi(get_value(row, lookup, ["keywords", "keyword"]))
 
     created_date = parse_date(get_value(row, lookup, ["addedondate", "addeddate", "createddate", "dateadded"]))
@@ -359,14 +362,14 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
         "license_ND": license_flags["ND"],
         "license_SA": license_flags["SA"],
         "author_retains": author_retains,
-        "preservation_has": bool(preservation_services) if preservation_services else parse_bool(
-            get_value(row, lookup, ["preservation", "haspreservation"])
-        ),
+        "preservation_has": bool(preservation_services),
         "preservation_service": preservation_services,
-        "pid_has": bool(pid_schemes) if pid_schemes else parse_bool(get_value(row, lookup, ["haspidscheme", "pid"])),
+        "pid_has": bool(pid_schemes),
         "pid_scheme": pid_schemes,
         "subject_terms": subjects,
         "language": languages,
+        "peer_review_type": peer_review_type,
+        "deposit_policy_directory": deposit_policy_directory,
         "keywords": keywords,
         "oa_start": get_value(row, lookup, ["oastart", "openaccessstart"]),
         "created_date": created_date,
