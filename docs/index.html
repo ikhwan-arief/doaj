@@ -111,7 +111,7 @@
       padding: 14px;
       overflow-x: auto;
     }
-    table { width: 100%; border-collapse: collapse; font-family: 'Source Sans Pro', system-ui, -apple-system, sans-serif; }
+    table { width: 100%; min-width: 940px; border-collapse: collapse; font-family: 'Source Sans Pro', system-ui, -apple-system, sans-serif; }
     th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
     th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
     .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; background: rgba(71,161,120,0.18); color: #2F6E52; }
@@ -168,7 +168,53 @@
       accent-color: var(--accent);
       cursor: pointer;
     }
-    footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 0 30px; }
+    .site-footer {
+      color: var(--muted);
+      font-size: 12px;
+      padding: 20px 28px 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .site-footer a { color: #982E0A; text-decoration: none; font-weight: 600; }
+    .site-footer a:hover { text-decoration: underline; }
+    .footer-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .footer-source { justify-content: flex-start; }
+    @media (max-width: 1024px) {
+      header { padding: 20px 20px 12px; }
+      .card-grid { margin: 0 20px 16px; }
+      .layout { padding: 0 20px 30px; }
+      .charts { padding: 0 20px; }
+      .table-box { margin: 18px 20px 30px; }
+    }
+    @media (max-width: 768px) {
+      h1 { font-size: 22px; }
+      .muted { font-size: 13px; }
+      .panel { padding: 14px; }
+      .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .card { padding: 12px 12px; }
+      .card .value { font-size: 20px; }
+      .chart-box { min-height: 260px; padding: 8px; }
+      .chart-box.map-box { min-height: 360px; }
+      .table-box { padding: 10px; }
+      .table-toolbar { align-items: flex-start; }
+      .table-nav { width: 100%; justify-content: space-between; }
+      .table-page { min-width: 0; }
+      .site-footer { padding: 16px 20px 24px; font-size: 11.5px; }
+      .footer-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+      select, input, button { font-size: 15px; }
+    }
+    @media (max-width: 480px) {
+      header { padding: 16px 14px 10px; }
+      .card-grid { margin: 0 14px 14px; grid-template-columns: 1fr; }
+      .layout { padding: 0 14px 24px; }
+      .charts { padding: 0 14px; gap: 10px; }
+      .chart-row { gap: 10px; }
+      .table-box { margin: 14px 14px 24px; }
+      .chart-box { min-height: 240px; }
+      .chart-box.map-box { min-height: 320px; }
+      .site-footer { padding: 14px 14px 20px; }
+    }
   </style>
 </head>
 <body>
@@ -313,7 +359,15 @@
     </table>
   </div>
 
-  <footer>Metadata is CC0. Dashboard is built from hourly DOAJ CSV snapshots.</footer>
+  <footer class="site-footer">
+    <div class="footer-row">
+      <div>Copyright: Ikhwan Arief, Universitas Andalas, Indonesia</div>
+      <div>License: <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a></div>
+    </div>
+    <div class="footer-row footer-source">
+      <div>Data source: <a href="https://doaj.org/docs/public-data-dump/" target="_blank" rel="noopener noreferrer">DOAJ</a></div>
+    </div>
+  </footer>
 
   <script>
     const state = {
