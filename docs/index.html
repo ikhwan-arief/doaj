@@ -10,23 +10,23 @@
   <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
   <style>
     :root {
-      --bg: #282624;           /* warm-black */
-      --card: #312f2d;         /* slightly lighter warm-black */
-      --muted: #F6F4F4;        /* light-grey */
-      --text: #ffffff;         /* white */
+      --bg: #F6F4F4;           /* light-grey */
+      --card: #FFFFFF;         /* white */
+      --muted: #5C5956;        /* dark-grey */
+      --text: #282624;         /* warm-black */
       --accent: #FD5A3B;       /* grapefruit */
       --accent-2: #FA9A87;     /* salmon */
       --accent-3: #47A178;     /* mid-green */
-      --border: #5C5956;       /* dark-grey */
-      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --border: #D7D2CE;       /* light border */
+      --shadow: 0 10px 24px rgba(40, 38, 36, 0.08);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: 'Source Sans Pro', system-ui, -apple-system, sans-serif;
       background:
-        radial-gradient(circle at 20% 20%, rgba(253,90,59,0.10), transparent 35%),
-        radial-gradient(circle at 80% 0%, rgba(71,161,120,0.12), transparent 35%),
+        radial-gradient(circle at 20% 20%, rgba(253,90,59,0.08), transparent 35%),
+        radial-gradient(circle at 80% 0%, rgba(163,195,134,0.12), transparent 35%),
         var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -75,11 +75,11 @@
       padding: 9px 10px;
       border-radius: 10px;
       border: 1px solid var(--border);
-      background: #24211f;
+      background: #FFFFFF;
       color: var(--text);
       font-size: 14px;
     }
-    input::placeholder { color: #6b7280; }
+    input::placeholder { color: #8C8681; }
     button {
       cursor: pointer;
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
@@ -117,8 +117,8 @@
     table { width: 100%; border-collapse: collapse; font-family: 'Source Sans Pro', system-ui, -apple-system, sans-serif; }
     th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
     th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
-    .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; background: rgba(71,161,120,0.18); color: #c7f0de; }
-    .pill.negative { background: rgba(253,90,59,0.18); color: #ffd3c7; }
+    .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; background: rgba(71,161,120,0.18); color: #2F6E52; }
+    .pill.negative { background: rgba(253,90,59,0.18); color: #8F311C; }
     .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; background: #22c55e; }
     .status-banner {
       margin: 0 28px 14px;
@@ -126,7 +126,7 @@
       border-radius: 10px;
       border: 1px solid var(--border);
       background: rgba(253, 90, 59, 0.12);
-      color: #ffe0d8;
+      color: #7A2A18;
       font-size: 14px;
     }
     .status-banner.hidden { display: none; }
@@ -153,7 +153,7 @@
   <header>
     <div>
       <h1>DOAJ Journals Dashboard</h1>
-      <div class="muted">Live snapshot (hourly) from DOAJ API v4</div>
+      <div class="muted">Live snapshot (hourly) from DOAJ CSV source</div>
     </div>
     <div style="flex:1"></div>
     <div class="muted" id="meta-info">Loading…</div>
@@ -260,7 +260,7 @@
     </table>
   </div>
 
-  <footer>Metadata is CC0. Dashboard is built from hourly DOAJ API snapshots.</footer>
+  <footer>Metadata is CC0. Dashboard is built from hourly DOAJ CSV snapshots.</footer>
 
   <script>
     const state = {
@@ -443,7 +443,7 @@
       state.aggregates = aggRes || {};
       state.meta = metaRes || {};
       if (state.meta.is_capped) {
-        setStatus(`Showing ${state.meta.fetched_total || journalsRes.length} of ${state.meta.source_total || journalsRes.length} journals due to DOAJ API result-window limit (${state.meta.result_cap || 1000} records per query).`);
+        setStatus(`Showing ${state.meta.fetched_total || journalsRes.length} of ${state.meta.source_total || journalsRes.length} journals due to source result-window limits (${state.meta.result_cap || 1000} records per query).`);
       } else {
         setStatus('');
       }
@@ -578,7 +578,7 @@
           margin:{l:260,r:12,t:46,b:48},
           paper_bgcolor:'rgba(0,0,0,0)',
           plot_bgcolor:'rgba(0,0,0,0)',
-          font:{color:'#F6F4F4'},
+          font:{color:'#282624'},
           yaxis:{automargin:true}
         },
         {displayModeBar:false}
@@ -588,15 +588,26 @@
       const licCounts = {};
       for (const r of state.filtered) if (r.license_type) licCounts[r.license_type] = (licCounts[r.license_type] || 0) + 1;
       const licEntries = Object.entries(licCounts);
-      Plotly.newPlot('chart-license', [{type:'pie', hole:0.45, labels: licEntries.map(d=>d[0]), values: licEntries.map(d=>d[1]), marker:{colors:['#FD5A3B','#FA9A87','#47A178','#3A5959','#A3C386','#F9D950']}}], {title:'License mix', paper_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
+      Plotly.newPlot('chart-license', [{type:'pie', hole:0.45, labels: licEntries.map(d=>d[0]), values: licEntries.map(d=>d[1]), marker:{colors:['#FD5A3B','#FA9A87','#47A178','#3A5959','#A3C386','#F9D950']}}], {title:'License mix', paper_bgcolor:'rgba(0,0,0,0)', font:{color:'#282624'}}, {displayModeBar:false});
 
-      // APC yes/no
+      // APC yes/no (pie)
       const apcCounts = {yes:0, no:0};
       for (const r of state.filtered) {
         if (r.apc_has === true) apcCounts.yes++;
         else if (r.apc_has === false) apcCounts.no++;
       }
-      Plotly.newPlot('chart-apc', [{type:'bar', x:['Yes','No'], y:[apcCounts.yes, apcCounts.no], marker:{color:['#FD5A3B','#47A178']}}], {title:'APC presence', margin:{l:40,r:10,t:40,b:40}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
+      Plotly.newPlot(
+        'chart-apc',
+        [{
+          type:'pie',
+          hole:0.42,
+          labels:['Yes', 'No'],
+          values:[apcCounts.yes, apcCounts.no],
+          marker:{colors:['#FD5A3B','#47A178']}
+        }],
+        {title:'APC presence', paper_bgcolor:'rgba(0,0,0,0)', font:{color:'#282624'}},
+        {displayModeBar:false}
+      );
 
       // Subjects top 12
       const subjCounts = {};
@@ -618,7 +629,7 @@
           margin:{l:320,r:12,t:46,b:48},
           paper_bgcolor:'rgba(0,0,0,0)',
           plot_bgcolor:'rgba(0,0,0,0)',
-          font:{color:'#F6F4F4'},
+          font:{color:'#282624'},
           yaxis:{automargin:true}
         },
         {displayModeBar:false}
@@ -633,7 +644,7 @@
         }
       }
       const years = Object.keys(yearCounts).map(Number).sort((a,b)=>a-b);
-      Plotly.newPlot('chart-timeline', [{type:'scatter', mode:'lines+markers', x: years, y: years.map(y=>yearCounts[y]), line:{color:'#47A178'}}], {title:'Created year trend', margin:{l:40,r:10,t:40,b:40}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
+      Plotly.newPlot('chart-timeline', [{type:'scatter', mode:'lines+markers', x: years, y: years.map(y=>yearCounts[y]), line:{color:'#47A178'}}], {title:'Created year trend', margin:{l:40,r:10,t:40,b:40}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#282624'}}, {displayModeBar:false});
     }
 
     function renderEmptyCharts() {
@@ -647,7 +658,7 @@
             title: titles[i],
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { color: '#F6F4F4' },
+            font: { color: '#282624' },
             xaxis: { visible: false },
             yaxis: { visible: false },
             annotations: [{
@@ -657,7 +668,7 @@
               yref: 'paper',
               x: 0.5,
               y: 0.5,
-              font: { color: '#F6F4F4', size: 14 }
+              font: { color: '#282624', size: 14 }
             }]
           },
           { displayModeBar: false }

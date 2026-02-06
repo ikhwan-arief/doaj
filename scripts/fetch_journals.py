@@ -1,42 +1,32 @@
 #!/usr/bin/env python3
-"""Fetch all DOAJ journal records and write normalized snapshots for the dashboard.
+"""Fetch DOAJ journal CSV and write normalized snapshots for the dashboard.
 
-- Hits DOAJ API v4 search endpoint and paginates.
-- Throttles to respect ~2 requests/second guidance.
-- Outputs:
-    docs/data/journals.json     (normalized records for client-side filtering)
-    docs/data/aggregates.json   (precomputed counts for quick display)
-    docs/data/meta.json         (fetch timestamp and source latest update)
-
-Env vars:
-- DOAJ_BASE_URL (optional): override API base, default https://doaj.org/api/v4
+Outputs:
+    docs/data/journals.json
+    docs/data/aggregates.json
+    docs/data/meta.json
 """
 from __future__ import annotations
 
+import csv
+import io
 import json
-import math
 import os
+import re
 import sys
-import time
 from collections import Counter
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from urllib.parse import quote
+from typing import Any, Dict, List, Optional, Sequence
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-BASE_URL = os.environ.get("DOAJ_BASE_URL", "https://doaj.org/api/v4")
-PAGE_SIZE = 100
-THROTTLE_SECONDS = 0.6  # ~1.6 rps to stay below 2 rps average
+CSV_URL = os.environ.get("DOAJ_CSV_URL", "https://doaj.org/csv")
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "docs", "data")
-ALL_QUERY_CANDIDATES = ("*:*", "*", "{}")
-MAX_RESULTS_PER_QUERY = 1000
 
 
 def build_session() -> requests.Session:
-    """Use retries for transient network/rate-limit responses."""
     retry = Retry(
         total=5,
         connect=5,
@@ -51,126 +41,225 @@ def build_session() -> requests.Session:
     session.mount("http://", adapter)
     session.headers.update(
         {
-            "Accept": "application/json",
-            "User-Agent": "doaj-dashboard-fetch/1.0",
+            "Accept": "text/csv,*/*",
+            "User-Agent": "doaj-dashboard-csv-fetch/1.0",
         }
     )
     return session
 
 
-def fetch_page(session: requests.Session, page: int, query: str) -> Dict[str, Any]:
-    url = f"{BASE_URL}/search/journals/{quote(query, safe='')}"
-    params = {
-        "page": page,
-        "pageSize": PAGE_SIZE,
-    }
-    resp = session.get(url, params=params, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+def normalize_header(value: str) -> str:
+    return "".join(ch.lower() for ch in value if ch.isalnum())
 
 
-def discover_query(session: requests.Session) -> str:
-    """Different API deployments can accept different 'match all' query strings."""
-    errors: List[str] = []
-    for query in ALL_QUERY_CANDIDATES:
+def split_multi(value: Optional[str]) -> List[str]:
+    if not value:
+        return []
+    parts = [p.strip() for p in re.split(r"[|;]", value) if p and p.strip()]
+    return [p for p in parts if p]
+
+
+def parse_bool(value: Optional[str]) -> Optional[bool]:
+    if value is None:
+        return None
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return None
+    if cleaned in {"yes", "y", "true", "1"}:
+        return True
+    if cleaned in {"no", "n", "false", "0"}:
+        return False
+    return None
+
+
+def parse_float(value: Optional[str]) -> Optional[float]:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    cleaned = cleaned.replace(",", "")
+    match = re.search(r"-?\d+(\.\d+)?", cleaned)
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except ValueError:
+        return None
+
+
+def parse_date(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+
+    iso_candidate = text.replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(iso_candidate)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+    except ValueError:
+        pass
+
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%d.%m.%Y"):
         try:
-            payload = fetch_page(session, page=1, query=query)
-            if isinstance(payload.get("results", []), list):
-                return query
-            errors.append(f"{query}: unexpected payload shape")
-        except requests.RequestException as err:
-            errors.append(f"{query}: {err}")
-    raise RuntimeError("Unable to discover DOAJ all-record query. " + " | ".join(errors))
+            dt = datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
+            return dt.isoformat()
+        except ValueError:
+            continue
+
+    year_match = re.search(r"\b(19|20)\d{2}\b", text)
+    if year_match:
+        year = int(year_match.group(0))
+        return datetime(year, 1, 1, tzinfo=timezone.utc).isoformat()
+    return None
 
 
-def normalize_record(rec: Dict[str, Any]) -> Dict[str, Any]:
-    admin = rec.get("admin", {})
-    bj = rec.get("bibjson", {})
+def parse_license_flags(license_text: Optional[str]) -> Dict[str, Optional[bool]]:
+    if not license_text:
+        return {"BY": None, "NC": None, "ND": None, "SA": None}
+    normalized = license_text.upper().replace("/", " ").replace("-", " ")
+    has_by = " BY " in f" {normalized} "
+    has_nc = " NC " in f" {normalized} "
+    has_nd = " ND " in f" {normalized} "
+    has_sa = " SA " in f" {normalized} "
+    return {"BY": has_by, "NC": has_nc, "ND": has_nd, "SA": has_sa}
 
-    def _safe_list(val: Any) -> List[Any]:
-        if val is None:
-            return []
-        if isinstance(val, list):
-            return val
-        return [val]
 
-    def _first_dict(val: Any) -> Dict[str, Any]:
-        if isinstance(val, dict):
-            return val
-        if isinstance(val, list):
-            for item in val:
-                if isinstance(item, dict):
-                    return item
-        return {}
+def header_lookup(headers: Sequence[str]) -> Dict[str, str]:
+    return {normalize_header(h): h for h in headers if h}
 
-    def _preservation_service(val: Any) -> Optional[str]:
-        if not val:
-            return None
-        if isinstance(val, list):
-            return val[0] if val else None
-        return str(val)
 
-    apc = _first_dict(bj.get("apc"))
-    apc_max = _first_dict(apc.get("max"))
-    license_raw = bj.get("license")
-    license_block = _first_dict(license_raw)
-    copyright_block = _first_dict(bj.get("copyright"))
-    waiver_block = _first_dict(bj.get("waiver"))
-    preservation_block = _first_dict(bj.get("preservation"))
-    pid_block = _first_dict(bj.get("pid_scheme"))
+def find_header(lookup: Dict[str, str], candidates: Sequence[str]) -> Optional[str]:
+    normalized_candidates = [normalize_header(c) for c in candidates]
 
-    publisher_raw = bj.get("publisher")
-    publisher_block = _first_dict(publisher_raw)
-    publisher_name = publisher_block.get("name")
-    publisher_country = publisher_block.get("country")
-    if not publisher_name and isinstance(publisher_raw, str):
-        publisher_name = publisher_raw
+    for candidate in normalized_candidates:
+        if candidate in lookup:
+            return lookup[candidate]
 
-    subjects = _safe_list(bj.get("subject"))
-    subject_terms: List[str] = []
-    for item in subjects:
-        if isinstance(item, dict):
-            term = item.get("term")
-            if term:
-                subject_terms.append(str(term))
-        elif item:
-            subject_terms.append(str(item))
+    for candidate in normalized_candidates:
+        for key, raw in lookup.items():
+            if candidate and candidate in key:
+                return raw
+    return None
 
-    license_type = license_block.get("type")
-    license_url = license_block.get("url")
-    if not license_type and isinstance(license_raw, str):
-        license_type = license_raw
+
+def get_value(row: Dict[str, str], lookup: Dict[str, str], candidates: Sequence[str]) -> Optional[str]:
+    header = find_header(lookup, candidates)
+    if not header:
+        return None
+    value = row.get(header)
+    if value is None:
+        return None
+    value = value.strip()
+    return value if value else None
+
+
+def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Dict[str, Any]:
+    title = get_value(row, lookup, ["title", "journaltitle", "journal title"])
+    publisher = get_value(row, lookup, ["publisher", "publishername"])
+    country = get_value(row, lookup, ["country", "countryofpublisher", "journalcountry"])
+    license_type = get_value(row, lookup, ["license", "journallicense", "licensetype", "license terms"])
+    license_url = get_value(row, lookup, ["licenseurl", "licensetermsurl"])
+
+    apc_raw = get_value(row, lookup, ["apc", "articleprocessingcharges", "journalapc"])
+    apc_price = parse_float(get_value(row, lookup, ["apcamount", "apcmax", "maximumapc", "maxapc"]))
+    apc_currency = get_value(row, lookup, ["apccurrency", "currency"])
+    apc_has = parse_bool(apc_raw)
+
+    author_retains = parse_bool(
+        get_value(
+            row,
+            lookup,
+            [
+                "authorholdscopyrightwithoutrestrictions",
+                "authorretaincopyright",
+                "authorcopyrightholder",
+                "copyrightholder",
+            ],
+        )
+    )
+
+    preservation_services = split_multi(
+        get_value(row, lookup, ["preservationservice", "preservationservices", "digitalarchivingpolicy"])
+    )
+    pid_schemes = split_multi(
+        get_value(
+            row,
+            lookup,
+            [
+                "persistentarticleidentifiers",
+                "pidscheme",
+                "persistentidentifiers",
+            ],
+        )
+    )
+    subjects = split_multi(
+        get_value(
+            row,
+            lookup,
+            [
+                "subject",
+                "subjects",
+                "lccsubjectcategory",
+                "lcccodes",
+            ],
+        )
+    )
+    languages = split_multi(get_value(row, lookup, ["language", "journallanguage"]))
+    keywords = split_multi(get_value(row, lookup, ["keywords", "keyword"]))
+
+    created_date = parse_date(get_value(row, lookup, ["addedondate", "addeddate", "createddate", "dateadded"]))
+    last_updated = parse_date(
+        get_value(
+            row,
+            lookup,
+            ["lastupdated", "updatedon", "mostrecentupdate", "dateupdated"],
+        )
+    )
+
+    issn_print = get_value(row, lookup, ["printissn", "pissn", "issnprint"])
+    issn_online = get_value(row, lookup, ["onlineissn", "eissn", "issnonline"])
+    fallback_id = get_value(row, lookup, ["id", "journalid", "doajid", "identifier"])
+    record_id = fallback_id or issn_online or issn_print or f"row-{index}"
+
+    license_flags = parse_license_flags(license_type)
 
     return {
-        "id": rec.get("id"),
-        "title": bj.get("title"),
-        "publisher": publisher_name,
-        "country": publisher_country,
-        "pissn": bj.get("pissn"),
-        "eissn": bj.get("eissn"),
-        "apc_has": bool(apc.get("has_apc")) if apc.get("has_apc") is not None else None,
-        "apc_max_price": apc_max.get("price"),
-        "apc_max_currency": apc_max.get("currency"),
-        "waiver_has": bool(waiver_block.get("has_waiver")) if waiver_block.get("has_waiver") is not None else None,
+        "id": record_id,
+        "title": title,
+        "publisher": publisher,
+        "country": country,
+        "pissn": issn_print,
+        "eissn": issn_online,
+        "apc_has": apc_has,
+        "apc_max_price": apc_price,
+        "apc_max_currency": apc_currency,
+        "waiver_has": parse_bool(get_value(row, lookup, ["waiver", "waiverpolicy", "waiveravailable"])),
         "license_type": license_type,
         "license_url": license_url,
-        "license_BY": bool(license_block.get("BY")) if license_block.get("BY") is not None else None,
-        "license_NC": bool(license_block.get("NC")) if license_block.get("NC") is not None else None,
-        "license_ND": bool(license_block.get("ND")) if license_block.get("ND") is not None else None,
-        "license_SA": bool(license_block.get("SA")) if license_block.get("SA") is not None else None,
-        "author_retains": bool(copyright_block.get("author_retains")) if copyright_block.get("author_retains") is not None else None,
-        "preservation_has": bool(preservation_block.get("has_preservation")) if preservation_block.get("has_preservation") is not None else None,
-        "preservation_service": _preservation_service(preservation_block.get("service")),
-        "pid_has": bool(pid_block.get("has_pid_scheme")) if pid_block.get("has_pid_scheme") is not None else None,
-        "pid_scheme": pid_block.get("scheme"),
-        "subject_terms": subject_terms,
-        "language": _safe_list(bj.get("language")),
-        "keywords": _safe_list(bj.get("keywords")),
-        "oa_start": bj.get("oa_start"),
-        "created_date": rec.get("created_date"),
-        "last_updated": rec.get("last_updated"),
-        "last_manual_update": rec.get("last_manual_update"),
-        "in_doaj": bool(admin.get("in_doaj")) if admin.get("in_doaj") is not None else None,
+        "license_BY": license_flags["BY"],
+        "license_NC": license_flags["NC"],
+        "license_ND": license_flags["ND"],
+        "license_SA": license_flags["SA"],
+        "author_retains": author_retains,
+        "preservation_has": bool(preservation_services) if preservation_services else parse_bool(
+            get_value(row, lookup, ["preservation", "haspreservation"])
+        ),
+        "preservation_service": preservation_services,
+        "pid_has": bool(pid_schemes) if pid_schemes else parse_bool(get_value(row, lookup, ["haspidscheme", "pid"])),
+        "pid_scheme": pid_schemes,
+        "subject_terms": subjects,
+        "language": languages,
+        "keywords": keywords,
+        "oa_start": get_value(row, lookup, ["oastart", "openaccessstart"]),
+        "created_date": created_date,
+        "last_updated": last_updated,
+        "last_manual_update": None,
+        "in_doaj": True,
     }
 
 
@@ -184,28 +273,29 @@ def aggregate(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     author_retains = Counter("yes" if r.get("author_retains") else "no" for r in records if r.get("author_retains") is not None)
 
     subjects = Counter()
-    for r in records:
-        for term in r.get("subject_terms", []) or []:
+    for record in records:
+        for term in record.get("subject_terms", []) or []:
             subjects[term] += 1
 
     created_year = Counter()
-    for r in records:
-        dt = r.get("created_date")
-        if dt:
-            try:
-                year = datetime.fromisoformat(dt.replace("Z", "+00:00")).year
-                created_year[year] += 1
-            except Exception:
-                continue
-
-    last_updated_max = None
-    for r in records:
-        lu = r.get("last_updated")
-        if not lu:
+    for record in records:
+        created = record.get("created_date")
+        if not created:
             continue
         try:
-            parsed = datetime.fromisoformat(lu.replace("Z", "+00:00"))
-        except Exception:
+            year = datetime.fromisoformat(created.replace("Z", "+00:00")).year
+        except ValueError:
+            continue
+        created_year[year] += 1
+
+    last_updated_max = None
+    for record in records:
+        updated = record.get("last_updated")
+        if not updated:
+            continue
+        try:
+            parsed = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+        except ValueError:
             continue
         if last_updated_max is None or parsed > last_updated_max:
             last_updated_max = parsed
@@ -225,83 +315,68 @@ def aggregate(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def load_csv_records(session: requests.Session) -> tuple[List[Dict[str, Any]], List[str], Dict[str, str]]:
+    response = session.get(CSV_URL, timeout=120)
+    response.raise_for_status()
+
+    text = response.content.decode("utf-8-sig", errors="replace")
+    reader = csv.DictReader(io.StringIO(text))
+    headers = reader.fieldnames or []
+    lookup = header_lookup(headers)
+
+    normalized: List[Dict[str, Any]] = []
+    for idx, row in enumerate(reader, start=1):
+        normalized.append(normalize_row(row, lookup, idx))
+
+    response_meta = {
+        "etag": response.headers.get("ETag"),
+        "last_modified": response.headers.get("Last-Modified"),
+        "content_length": response.headers.get("Content-Length"),
+    }
+    return normalized, headers, response_meta
+
+
 def main() -> int:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     session = build_session()
 
-    records: List[Dict[str, Any]] = []
+    print(f"Downloading CSV from {CSV_URL}", file=sys.stderr)
+    records, headers, response_meta = load_csv_records(session)
+    print(f"Fetched {len(records)} journal rows from CSV", file=sys.stderr)
 
-    # First page to get total
-    all_query = discover_query(session)
-    print(f"Using all-record query: {all_query}", file=sys.stderr)
-    first = fetch_page(session, page=1, query=all_query)
-    total = first.get("total", 0)
-    records.extend(first.get("results", []))
-
-    target_total = min(total, MAX_RESULTS_PER_QUERY) if total else len(records)
-    total_pages = math.ceil(target_total / PAGE_SIZE) if target_total else 1
-    is_capped = bool(total and total > MAX_RESULTS_PER_QUERY)
-    if is_capped:
-        print(
-            f"Found total {total} journals; API result window limit detected. "
-            f"Fetching first {target_total} journals ({total_pages} pages).",
-            file=sys.stderr,
-        )
-    else:
-        print(f"Found total {total} journals; fetching {total_pages} pages", file=sys.stderr)
-
-    for page in range(2, total_pages + 1):
-        time.sleep(THROTTLE_SECONDS)
-        try:
-            payload = fetch_page(session, page=page, query=all_query)
-        except requests.HTTPError as err:
-            # Some DOAJ deployments return 400 when page window exceeds limit.
-            if err.response is not None and err.response.status_code == 400:
-                print(
-                    f"Stopped at page {page} due to API result window limit (HTTP 400).",
-                    file=sys.stderr,
-                )
-                break
-            raise
-        page_results = payload.get("results", [])
-        if not page_results:
-            break
-        records.extend(page_results)
-        print(f"Fetched page {page}/{total_pages}", file=sys.stderr)
-        if len(records) >= target_total:
-            break
-
-    normalized = [normalize_record(r) for r in records[:target_total]]
-    agg = aggregate(normalized)
-
+    aggregates = aggregate(records)
     fetched_at = datetime.now(timezone.utc).isoformat()
 
-    # Write outputs
     journals_path = os.path.join(OUTPUT_DIR, "journals.json")
     aggregates_path = os.path.join(OUTPUT_DIR, "aggregates.json")
     meta_path = os.path.join(OUTPUT_DIR, "meta.json")
 
-    with open(journals_path, "w", encoding="utf-8") as f:
-        json.dump(normalized, f, ensure_ascii=False)
+    with open(journals_path, "w", encoding="utf-8") as handle:
+        json.dump(records, handle, ensure_ascii=False)
 
-    with open(aggregates_path, "w", encoding="utf-8") as f:
-        json.dump(agg, f, ensure_ascii=False)
+    with open(aggregates_path, "w", encoding="utf-8") as handle:
+        json.dump(aggregates, handle, ensure_ascii=False)
 
-    with open(meta_path, "w", encoding="utf-8") as f:
+    with open(meta_path, "w", encoding="utf-8") as handle:
         json.dump(
             {
+                "source_type": "csv",
+                "source_url": CSV_URL,
+                "source_headers": headers,
+                "source_header_count": len(headers),
+                "source_total": len(records),
+                "fetched_total": len(records),
+                "is_capped": False,
+                "result_cap": None,
                 "fetched_at": fetched_at,
-                "source_last_updated_max": agg.get("last_updated_max"),
-                "source_total": total,
-                "fetched_total": len(normalized),
-                "result_cap": MAX_RESULTS_PER_QUERY,
-                "is_capped": is_capped,
+                "source_last_updated_max": aggregates.get("last_updated_max"),
+                "source_response": response_meta,
             },
-            f,
+            handle,
             ensure_ascii=False,
         )
 
-    print(f"Wrote {journals_path} ({len(normalized)} records)")
+    print(f"Wrote {journals_path} ({len(records)} records)")
     return 0
 
 
