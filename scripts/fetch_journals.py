@@ -76,6 +76,54 @@ def split_multi(value: Optional[str]) -> List[str]:
     return unique
 
 
+def canonicalize_preservation_term(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    if not cleaned:
+        return ""
+
+    normalized = re.sub(r"[^a-z0-9\s]", " ", cleaned.lower())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    aliases = [
+        (r"\bajol\b|\bafrican journals? online\b", "African Journals Online"),
+        (r"\bclockss\b", "CLOCKSS"),
+        (r"\blockss\b", "LOCKSS"),
+        (r"\bpkp\b.*\bpn\b|\bpkp preservation network\b", "PKP Preservation Network"),
+        (r"\bportico\b", "Portico"),
+        (r"\bpubmed central\b|\bpmc\b", "PubMed Central"),
+        (r"\binternet archive\b", "Internet Archive"),
+        (r"\bcariniana\b", "Cariniana Network"),
+        (
+            r"\bnational library of the netherlands\b|\bkoninklijke bibliotheek\b|\bkb\b",
+            "KB National Library of the Netherlands",
+        ),
+    ]
+
+    for pattern, canonical in aliases:
+        if re.search(pattern, normalized):
+            return canonical
+
+    # Prefer expanded name inside parentheses when available.
+    paren = re.search(r"\(([^)]+)\)", cleaned)
+    if paren:
+        inner = re.sub(r"\s+", " ", paren.group(1).strip())
+        if len(inner) > 4 and " " in inner:
+            return inner
+
+    return cleaned
+
+
+def canonicalize_preservation_services(values: Sequence[str]) -> List[str]:
+    seen = set()
+    canonical: List[str] = []
+    for value in values:
+        term = canonicalize_preservation_term(value)
+        if term and term not in seen:
+            seen.add(term)
+            canonical.append(term)
+    return canonical
+
+
 def parse_bool(value: Optional[str]) -> Optional[bool]:
     if value is None:
         return None
@@ -200,8 +248,10 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
         )
     )
 
-    preservation_services = split_multi(
+    preservation_services = canonicalize_preservation_services(
+        split_multi(
         get_value(row, lookup, ["preservationservice", "preservationservices", "digitalarchivingpolicy"])
+        )
     )
     pid_schemes = split_multi(
         get_value(

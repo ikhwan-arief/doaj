@@ -319,6 +319,42 @@
       return raw;
     }
 
+    function normalizePreservationTerm(value) {
+      if (!value) return '';
+      const cleaned = String(value).replace(/\s+/g, ' ').trim();
+      if (!cleaned) return '';
+      const normalized = cleaned.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+      const aliases = [
+        { re: /\bajol\b|\bafrican journals? online\b/, canonical: 'African Journals Online' },
+        { re: /\bclockss\b/, canonical: 'CLOCKSS' },
+        { re: /\blockss\b/, canonical: 'LOCKSS' },
+        { re: /\bpkp\b.*\bpn\b|\bpkp preservation network\b/, canonical: 'PKP Preservation Network' },
+        { re: /\bportico\b/, canonical: 'Portico' },
+        { re: /\bpubmed central\b|\bpmc\b/, canonical: 'PubMed Central' },
+        { re: /\binternet archive\b/, canonical: 'Internet Archive' },
+        { re: /\bcariniana\b/, canonical: 'Cariniana Network' },
+        { re: /\bnational library of the netherlands\b|\bkoninklijke bibliotheek\b|\bkb\b/, canonical: 'KB National Library of the Netherlands' }
+      ];
+
+      for (const alias of aliases) {
+        if (alias.re.test(normalized)) return alias.canonical;
+      }
+
+      const paren = cleaned.match(/\(([^)]+)\)/);
+      if (paren) {
+        const inner = paren[1].replace(/\s+/g, ' ').trim();
+        if (inner.length > 4 && inner.includes(' ')) return inner;
+      }
+
+      return cleaned;
+    }
+
+    function getPreservationTerms(value) {
+      const terms = toValueList(value).map(normalizePreservationTerm).filter(Boolean);
+      return [...new Set(terms)];
+    }
+
     function titleCase(value) {
       return String(value)
         .toLowerCase()
@@ -457,7 +493,7 @@
         .sort((a, b) => formatCountry(a).localeCompare(formatCountry(b)));
       const licenses = Array.from(new Set(state.records.flatMap(r => toValueList(r.license_type))))
         .sort((a, b) => String(a).localeCompare(String(b)));
-      const preservations = Array.from(new Set(state.records.flatMap(r => toValueList(r.preservation_service))))
+      const preservations = Array.from(new Set(state.records.flatMap(r => getPreservationTerms(r.preservation_service))))
         .sort((a, b) => String(a).localeCompare(String(b)));
       const pidSchemes = Array.from(new Set(state.records.flatMap(r => toValueList(r.pid_scheme))))
         .sort((a, b) => String(a).localeCompare(String(b)));
@@ -516,7 +552,7 @@
         if (apc === 'no' && r.apc_has !== false) return false;
         if (author === 'yes' && r.author_retains !== true) return false;
         if (author === 'no' && r.author_retains !== false) return false;
-        if (preservation && !toValueList(r.preservation_service).includes(preservation)) return false;
+        if (preservation && !getPreservationTerms(r.preservation_service).includes(preservation)) return false;
         if (pid && !toValueList(r.pid_scheme).includes(pid)) return false;
         if (publisher && !(r.publisher || '').toLowerCase().includes(publisher)) return false;
         if (subject && !(r.subject_terms || []).some(s => s.toLowerCase().includes(subject))) return false;
@@ -695,7 +731,7 @@
       }
       for (const r of rows) {
         const licenseText = toValueList(r.license_type).join(', ') || NOT_AVAILABLE;
-        const preservationText = toValueList(r.preservation_service).join(', ') || NOT_AVAILABLE;
+        const preservationText = getPreservationTerms(r.preservation_service).join(', ') || NOT_AVAILABLE;
         const pidText = toValueList(r.pid_scheme).map(formatPidScheme).join(', ') || NOT_AVAILABLE;
         const tr = document.createElement('tr');
         tr.innerHTML = `
