@@ -87,21 +87,21 @@ def normalize_record(rec: Dict[str, Any]) -> Dict[str, Any]:
     admin = rec.get("admin", {})
     bj = rec.get("bibjson", {})
 
-    apc = bj.get("apc", {}) or {}
-    license_block = bj.get("license", {}) or {}
-    copyright_block = bj.get("copyright", {}) or {}
-    waiver_block = bj.get("waiver", {}) or {}
-    preservation_block = bj.get("preservation", {}) or {}
-    pid_block = bj.get("pid_scheme", {}) or {}
-    publisher = bj.get("publisher", {}) or {}
-    subjects = bj.get("subject", []) or []
-
     def _safe_list(val: Any) -> List[Any]:
         if val is None:
             return []
         if isinstance(val, list):
             return val
         return [val]
+
+    def _first_dict(val: Any) -> Dict[str, Any]:
+        if isinstance(val, dict):
+            return val
+        if isinstance(val, list):
+            for item in val:
+                if isinstance(item, dict):
+                    return item
+        return {}
 
     def _preservation_service(val: Any) -> Optional[str]:
         if not val:
@@ -110,19 +110,49 @@ def normalize_record(rec: Dict[str, Any]) -> Dict[str, Any]:
             return val[0] if val else None
         return str(val)
 
+    apc = _first_dict(bj.get("apc"))
+    license_raw = bj.get("license")
+    license_block = _first_dict(license_raw)
+    copyright_block = _first_dict(bj.get("copyright"))
+    waiver_block = _first_dict(bj.get("waiver"))
+    preservation_block = _first_dict(bj.get("preservation"))
+    pid_block = _first_dict(bj.get("pid_scheme"))
+
+    publisher_raw = bj.get("publisher")
+    publisher_block = _first_dict(publisher_raw)
+    publisher_name = publisher_block.get("name")
+    publisher_country = publisher_block.get("country")
+    if not publisher_name and isinstance(publisher_raw, str):
+        publisher_name = publisher_raw
+
+    subjects = _safe_list(bj.get("subject"))
+    subject_terms: List[str] = []
+    for item in subjects:
+        if isinstance(item, dict):
+            term = item.get("term")
+            if term:
+                subject_terms.append(str(term))
+        elif item:
+            subject_terms.append(str(item))
+
+    license_type = license_block.get("type")
+    license_url = license_block.get("url")
+    if not license_type and isinstance(license_raw, str):
+        license_type = license_raw
+
     return {
         "id": rec.get("id"),
         "title": bj.get("title"),
-        "publisher": publisher.get("name"),
-        "country": publisher.get("country"),
+        "publisher": publisher_name,
+        "country": publisher_country,
         "pissn": bj.get("pissn"),
         "eissn": bj.get("eissn"),
         "apc_has": bool(apc.get("has_apc")) if apc.get("has_apc") is not None else None,
         "apc_max_price": (apc.get("max", {}) or {}).get("price"),
         "apc_max_currency": (apc.get("max", {}) or {}).get("currency"),
         "waiver_has": bool(waiver_block.get("has_waiver")) if waiver_block.get("has_waiver") is not None else None,
-        "license_type": license_block.get("type"),
-        "license_url": license_block.get("url"),
+        "license_type": license_type,
+        "license_url": license_url,
         "license_BY": bool(license_block.get("BY")) if license_block.get("BY") is not None else None,
         "license_NC": bool(license_block.get("NC")) if license_block.get("NC") is not None else None,
         "license_ND": bool(license_block.get("ND")) if license_block.get("ND") is not None else None,
@@ -132,7 +162,7 @@ def normalize_record(rec: Dict[str, Any]) -> Dict[str, Any]:
         "preservation_service": _preservation_service(preservation_block.get("service")),
         "pid_has": bool(pid_block.get("has_pid_scheme")) if pid_block.get("has_pid_scheme") is not None else None,
         "pid_scheme": pid_block.get("scheme"),
-        "subject_terms": [s.get("term") for s in subjects if s.get("term")],
+        "subject_terms": subject_terms,
         "language": _safe_list(bj.get("language")),
         "keywords": _safe_list(bj.get("keywords")),
         "oa_start": bj.get("oa_start"),
