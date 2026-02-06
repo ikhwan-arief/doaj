@@ -76,13 +76,23 @@ def split_multi(value: Optional[str]) -> List[str]:
     return unique
 
 
+def normalize_for_match(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9\s]", " ", value.lower())
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def smart_title(value: str) -> str:
+    if value.islower() or value.isupper():
+        return value.title()
+    return value
+
+
 def canonicalize_preservation_term(value: str) -> str:
     cleaned = re.sub(r"\s+", " ", value.strip())
     if not cleaned:
         return ""
 
-    normalized = re.sub(r"[^a-z0-9\s]", " ", cleaned.lower())
-    normalized = re.sub(r"\s+", " ", normalized).strip()
+    normalized = normalize_for_match(cleaned)
 
     aliases = [
         (r"\bajol\b|\bafrican journals? online\b", "African Journals Online"),
@@ -94,6 +104,31 @@ def canonicalize_preservation_term(value: str) -> str:
         (r"\bpubmed central\b|\bpmc\b", "PubMed Central"),
         (r"\binternet archive\b", "Internet Archive"),
         (r"\bcariniana\b", "Cariniana Network"),
+        (r"\bscholars?\s*portal\b", "Scholars Portal"),
+        (
+            r"\bhrcak\b|\bhr cak\b|\bhr ak\b|portal of (croatian|scientific journals of croatia)",
+            "Hrcak Portal of Croatian Scientific Journals",
+        ),
+        (r"\be\s*library\b|\belibrary\b|russian electronic scientific library", "eLIBRARY.RU"),
+        (r"\bmagiran\b", "Magiran"),
+        (r"\bnoormags?\b", "Noormags"),
+        (r"\bisc\b|\bislamic world science citation center\b", "Islamic World Science Citation Center"),
+        (r"\bscindeks\b|serbian citation index", "SCIndeks (Serbian Citation Index)"),
+        (r"\bcross\s*ref\b|\bcrossref\b", "CrossRef"),
+        (r"\bkoreamed synapse\b", "KoreaMed Synapse"),
+        (r"\bkoreamed\b", "KoreaMed"),
+        (r"\bceeol\b", "CEEOL"),
+        (r"\bcines\b", "CINES"),
+        (r"\braco\b", "RACO"),
+        (r"\bscholar\b.*\bportal\b", "Scholars Portal"),
+        (r"\buniversity computing centre srce\b", "Hrcak Portal of Croatian Scientific Journals"),
+        (r"\bgoogle scholar\b", "Google Scholar"),
+        (r"\bsid\b", "SID"),
+        (r"\bniscpr online periodicals repository\b", "NIScPR Online Periodicals Repository"),
+        (r"\bin[- ]?house archiving\b", "In-house Archiving"),
+        (r"\bjournal'?s?\s+website\b|\bjournal\s+website\b", "Journal Website"),
+        (r"\bnational digital archives of iranian scholarly journals\b", "National Digital Archives of Iranian Scholarly Journals"),
+        (r"\be\s*depot\b", "E-Depot"),
         (
             r"\bnational library of the netherlands\b|\bkoninklijke bibliotheek\b|\bkb\b",
             "KB National Library of the Netherlands",
@@ -111,9 +146,7 @@ def canonicalize_preservation_term(value: str) -> str:
         if len(inner) > 4 and " " in inner:
             return inner
 
-    if cleaned.islower() or cleaned.isupper():
-        return cleaned.title()
-    return cleaned
+    return smart_title(cleaned)
 
 
 def canonicalize_preservation_services(values: Sequence[str]) -> List[str]:
@@ -132,8 +165,7 @@ def canonicalize_pid_scheme_term(value: str) -> str:
     if not cleaned:
         return ""
 
-    normalized = re.sub(r"[^a-z0-9\s]", " ", cleaned.lower())
-    normalized = re.sub(r"\s+", " ", normalized).strip()
+    normalized = normalize_for_match(cleaned)
 
     aliases = [
         (r"\bcross\s*ref\b|\bcrossref\b|\bcrossreff\b|\bcrossref doi\b|\bdoi.*crossref\b|\bcrossref.*doi\b", "CrossRef"),
@@ -152,9 +184,7 @@ def canonicalize_pid_scheme_term(value: str) -> str:
         if re.search(pattern, normalized):
             return canonical
 
-    if cleaned.islower() or cleaned.isupper():
-        return cleaned.title()
-    return cleaned
+    return smart_title(cleaned)
 
 
 def canonicalize_pid_schemes(values: Sequence[str]) -> List[str]:
@@ -162,6 +192,102 @@ def canonicalize_pid_schemes(values: Sequence[str]) -> List[str]:
     canonical: List[str] = []
     for value in values:
         term = canonicalize_pid_scheme_term(value)
+        if term and term not in seen:
+            seen.add(term)
+            canonical.append(term)
+    return canonical
+
+
+def canonicalize_peer_review_term(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    if not cleaned:
+        return ""
+
+    normalized = normalize_for_match(cleaned)
+
+    aliases = [
+        (r"\bpartial\b.*\bdouble\b.*\b(anonymous|blind)\b|\bdouble\b.*\b(anonymous|blind)\b", "Double anonymous peer review"),
+        (r"\btriple\b.*\b(anonymous|blind)\b", "Triple anonymous peer review"),
+        (r"\bopen peer commentary\b|\bopen\b.*\bpeer\b.*\breview\b", "Open peer review"),
+        (r"\bpost publication\b.*\bpeer\b.*\breview\b", "Post-publication peer review"),
+        (r"\bcrowd\b.*\breview\b", "Crowd review"),
+        (r"\bcommittee\b.*\breview\b", "Committee review"),
+        (r"\b(editorial review|collaborative editorial)\b", "Editorial review"),
+        (r"\b(single|anonymous|blind)\b.*\bpeer\b.*\breview\b|\banonymous peer review\b", "Anonymous peer review"),
+        (r"\bpeer\b.*\breview\b", "Peer review"),
+    ]
+
+    for pattern, canonical in aliases:
+        if re.search(pattern, normalized):
+            return canonical
+
+    return smart_title(cleaned)
+
+
+def canonicalize_peer_review_types(values: Sequence[str]) -> List[str]:
+    seen = set()
+    canonical: List[str] = []
+    for value in values:
+        term = canonicalize_peer_review_term(value)
+        if term and term not in seen:
+            seen.add(term)
+            canonical.append(term)
+    return canonical
+
+
+def canonicalize_deposit_policy_term(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    if not cleaned:
+        return ""
+
+    normalized = normalize_for_match(cleaned)
+
+    aliases = [
+        (r"\bopen policy finder\b|\bsherpa\s*romeo\b", "Open Policy Finder"),
+        (r"\bdiadorim\b", "Diadorim"),
+        (r"\bdulcinea\b", "Dulcinea"),
+        (r"\bmir\s*bel\b|\bmirabel\b", "Mir@bel"),
+        (r"\bmalena\b", "Malena"),
+        (r"\baura\b", "AURA"),
+        (r"\bdergipark\b", "DergiPark"),
+        (r"\bgaruda\b|\bgarba rujukan digital\b", "Garuda"),
+        (
+            r"\bpulisher\b.*\b(site|website)\b|\bpublisher\b.*\bown\b.*\b(site|website)\b|\bpublisher\b.*\b(site|website)\b",
+            "Publisher's own site",
+        ),
+        (r"\bjournal\b.*\bown\b.*\b(site|website)\b|\bjournal own website\b", "Journal's own site"),
+        (r"\bjournal\b.*\b(site|website)\b", "Journal website"),
+        (r"\bpreprint\b.*\bpostprint\b.*\bpolicy\b", "Preprint and postprint policy"),
+        (r"\bself\b.*\barchiving\b", "Self-archiving policy"),
+        (r"\brepository\b.*\bpolicy\b", "Repository policy"),
+        (r"\bin[- ]?house\b.*\brepository\b", "In-house repository"),
+        (r"\bcopyright\b", "Copyright notice"),
+        (r"\bauthors?\b.*\brights?\b", "Authors' rights"),
+        (r"\binstitutional\b.*\brepository\b", "Institutional repository"),
+        (r"\bbrill\b", "Brill.com"),
+        (r"\bour own site\b", "Publisher's own site"),
+        (r"\bpublic and\s+or commercial subject based repositories\b", "Public and/or commercial subject-based repositories"),
+        (r"\bkarger permits authors of open access articles\b", "Karger policy statement"),
+        (r"\bcross\s*ref\b|\bcrossref\b", "CrossRef"),
+    ]
+
+    for pattern, canonical in aliases:
+        if re.search(pattern, normalized):
+            return canonical
+
+    if re.search(r"\bpublisher\b", normalized) and re.search(r"\b(site|website)\b", normalized):
+        return "Publisher's own site"
+    if re.search(r"\bjournal\b", normalized) and re.search(r"\b(site|website)\b", normalized):
+        return "Journal website"
+
+    return smart_title(cleaned)
+
+
+def canonicalize_deposit_policy_directories(values: Sequence[str]) -> List[str]:
+    seen = set()
+    canonical: List[str] = []
+    for value in values:
+        term = canonicalize_deposit_policy_term(value)
         if term and term not in seen:
             seen.add(term)
             canonical.append(term)
@@ -324,8 +450,10 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
         )
     )
     languages = split_multi(get_value(row, lookup, ["language", "journallanguage"]))
-    peer_review_type = split_multi(get_value(row, lookup, ["reviewprocess"]))
-    deposit_policy_directory = split_multi(get_value(row, lookup, ["depositpolicydirectory"]))
+    peer_review_type = canonicalize_peer_review_types(split_multi(get_value(row, lookup, ["reviewprocess"])))
+    deposit_policy_directory = canonicalize_deposit_policy_directories(
+        split_multi(get_value(row, lookup, ["depositpolicydirectory"]))
+    )
     keywords = split_multi(get_value(row, lookup, ["keywords", "keyword"]))
 
     created_date = parse_date(get_value(row, lookup, ["addedondate", "addeddate", "createddate", "dateadded"]))

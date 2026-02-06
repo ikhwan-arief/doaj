@@ -344,6 +344,18 @@
       return [...new Set(terms)];
     }
 
+    function normalizeForMatch(value) {
+      return String(value).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function smartTitle(value) {
+      const cleaned = String(value);
+      if (cleaned === cleaned.toLowerCase() || cleaned === cleaned.toUpperCase()) {
+        return titleCase(cleaned);
+      }
+      return cleaned;
+    }
+
     function formatPidScheme(value) {
       const canonical = normalizePidSchemeTerm(value);
       return canonical || NOT_AVAILABLE;
@@ -353,7 +365,7 @@
       if (!value) return '';
       const cleaned = String(value).replace(/\s+/g, ' ').trim();
       if (!cleaned) return '';
-      const normalized = cleaned.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      const normalized = normalizeForMatch(cleaned);
 
       const aliases = [
         { re: /\bcross\s*ref\b|\bcrossref\b|\bcrossreff\b|\bcrossref doi\b|\bdoi.*crossref\b|\bcrossref.*doi\b/, canonical: 'CrossRef' },
@@ -372,10 +384,7 @@
         if (alias.re.test(normalized)) return alias.canonical;
       }
 
-      if (cleaned === cleaned.toLowerCase() || cleaned === cleaned.toUpperCase()) {
-        return titleCase(cleaned);
-      }
-      return cleaned;
+      return smartTitle(cleaned);
     }
 
     function getPidSchemes(value) {
@@ -387,7 +396,7 @@
       if (!value) return '';
       const cleaned = String(value).replace(/\s+/g, ' ').trim();
       if (!cleaned) return '';
-      const normalized = cleaned.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      const normalized = normalizeForMatch(cleaned);
 
       const aliases = [
         { re: /\bajol\b|\bafrican journals? online\b/, canonical: 'African Journals Online' },
@@ -399,6 +408,28 @@
         { re: /\bpubmed central\b|\bpmc\b/, canonical: 'PubMed Central' },
         { re: /\binternet archive\b/, canonical: 'Internet Archive' },
         { re: /\bcariniana\b/, canonical: 'Cariniana Network' },
+        { re: /\bscholars?\s*portal\b/, canonical: 'Scholars Portal' },
+        { re: /\bhrcak\b|\bhr cak\b|\bhr ak\b|portal of (croatian|scientific journals of croatia)/, canonical: 'Hrcak Portal of Croatian Scientific Journals' },
+        { re: /\be\s*library\b|\belibrary\b|russian electronic scientific library/, canonical: 'eLIBRARY.RU' },
+        { re: /\bmagiran\b/, canonical: 'Magiran' },
+        { re: /\bnoormags?\b/, canonical: 'Noormags' },
+        { re: /\bisc\b|\bislamic world science citation center\b/, canonical: 'Islamic World Science Citation Center' },
+        { re: /\bscindeks\b|serbian citation index/, canonical: 'SCIndeks (Serbian Citation Index)' },
+        { re: /\bcross\s*ref\b|\bcrossref\b/, canonical: 'CrossRef' },
+        { re: /\bkoreamed synapse\b/, canonical: 'KoreaMed Synapse' },
+        { re: /\bkoreamed\b/, canonical: 'KoreaMed' },
+        { re: /\bceeol\b/, canonical: 'CEEOL' },
+        { re: /\bcines\b/, canonical: 'CINES' },
+        { re: /\braco\b/, canonical: 'RACO' },
+        { re: /\bscholar\b.*\bportal\b/, canonical: 'Scholars Portal' },
+        { re: /\buniversity computing centre srce\b/, canonical: 'Hrcak Portal of Croatian Scientific Journals' },
+        { re: /\bgoogle scholar\b/, canonical: 'Google Scholar' },
+        { re: /\bsid\b/, canonical: 'SID' },
+        { re: /\bniscpr online periodicals repository\b/, canonical: 'NIScPR Online Periodicals Repository' },
+        { re: /\bin[- ]?house archiving\b/, canonical: 'In-house Archiving' },
+        { re: /\bjournal'?s?\s+website\b|\bjournal\s+website\b/, canonical: 'Journal Website' },
+        { re: /\bnational digital archives of iranian scholarly journals\b/, canonical: 'National Digital Archives of Iranian Scholarly Journals' },
+        { re: /\be\s*depot\b/, canonical: 'E-Depot' },
         { re: /\bnational library of the netherlands\b|\bkoninklijke bibliotheek\b|\bkb\b/, canonical: 'KB National Library of the Netherlands' }
       ];
 
@@ -412,14 +443,85 @@
         if (inner.length > 4 && inner.includes(' ')) return inner;
       }
 
-      if (cleaned === cleaned.toLowerCase() || cleaned === cleaned.toUpperCase()) {
-        return titleCase(cleaned);
-      }
-      return cleaned;
+      return smartTitle(cleaned);
     }
 
     function getPreservationTerms(value) {
       const terms = toValueList(value).map(normalizePreservationTerm).filter(Boolean);
+      return [...new Set(terms)];
+    }
+
+    function normalizePeerReviewTerm(value) {
+      if (!value) return '';
+      const cleaned = String(value).replace(/\s+/g, ' ').trim();
+      if (!cleaned) return '';
+      const normalized = normalizeForMatch(cleaned);
+
+      const aliases = [
+        { re: /\bpartial\b.*\bdouble\b.*\b(anonymous|blind)\b|\bdouble\b.*\b(anonymous|blind)\b/, canonical: 'Double anonymous peer review' },
+        { re: /\btriple\b.*\b(anonymous|blind)\b/, canonical: 'Triple anonymous peer review' },
+        { re: /\bopen peer commentary\b|\bopen\b.*\bpeer\b.*\breview\b/, canonical: 'Open peer review' },
+        { re: /\bpost publication\b.*\bpeer\b.*\breview\b/, canonical: 'Post-publication peer review' },
+        { re: /\bcrowd\b.*\breview\b/, canonical: 'Crowd review' },
+        { re: /\bcommittee\b.*\breview\b/, canonical: 'Committee review' },
+        { re: /\b(editorial review|collaborative editorial)\b/, canonical: 'Editorial review' },
+        { re: /\b(single|anonymous|blind)\b.*\bpeer\b.*\breview\b|\banonymous peer review\b/, canonical: 'Anonymous peer review' },
+        { re: /\bpeer\b.*\breview\b/, canonical: 'Peer review' }
+      ];
+
+      for (const alias of aliases) {
+        if (alias.re.test(normalized)) return alias.canonical;
+      }
+      return smartTitle(cleaned);
+    }
+
+    function getPeerReviewTerms(value) {
+      const terms = toValueList(value).map(normalizePeerReviewTerm).filter(Boolean);
+      return [...new Set(terms)];
+    }
+
+    function normalizeDepositPolicyTerm(value) {
+      if (!value) return '';
+      const cleaned = String(value).replace(/\s+/g, ' ').trim();
+      if (!cleaned) return '';
+      const normalized = normalizeForMatch(cleaned);
+
+      const aliases = [
+        { re: /\bopen policy finder\b|\bsherpa\s*romeo\b/, canonical: 'Open Policy Finder' },
+        { re: /\bdiadorim\b/, canonical: 'Diadorim' },
+        { re: /\bdulcinea\b/, canonical: 'Dulcinea' },
+        { re: /\bmir\s*bel\b|\bmirabel\b/, canonical: 'Mir@bel' },
+        { re: /\bmalena\b/, canonical: 'Malena' },
+        { re: /\baura\b/, canonical: 'AURA' },
+        { re: /\bdergipark\b/, canonical: 'DergiPark' },
+        { re: /\bgaruda\b|\bgarba rujukan digital\b/, canonical: 'Garuda' },
+        { re: /\bpulisher\b.*\b(site|website)\b|\bpublisher\b.*\bown\b.*\b(site|website)\b|\bpublisher\b.*\b(site|website)\b/, canonical: "Publisher's own site" },
+        { re: /\bjournal\b.*\bown\b.*\b(site|website)\b|\bjournal own website\b/, canonical: "Journal's own site" },
+        { re: /\bjournal\b.*\b(site|website)\b/, canonical: 'Journal website' },
+        { re: /\bpreprint\b.*\bpostprint\b.*\bpolicy\b/, canonical: 'Preprint and postprint policy' },
+        { re: /\bself\b.*\barchiving\b/, canonical: 'Self-archiving policy' },
+        { re: /\brepository\b.*\bpolicy\b/, canonical: 'Repository policy' },
+        { re: /\bin[- ]?house\b.*\brepository\b/, canonical: 'In-house repository' },
+        { re: /\bcopyright\b/, canonical: 'Copyright notice' },
+        { re: /\bauthors?\b.*\brights?\b/, canonical: "Authors' rights" },
+        { re: /\binstitutional\b.*\brepository\b/, canonical: 'Institutional repository' },
+        { re: /\bbrill\b/, canonical: 'Brill.com' },
+        { re: /\bour own site\b/, canonical: "Publisher's own site" },
+        { re: /\bpublic and\s+or commercial subject based repositories\b/, canonical: 'Public and/or commercial subject-based repositories' },
+        { re: /\bkarger permits authors of open access articles\b/, canonical: 'Karger policy statement' },
+        { re: /\bcross\s*ref\b|\bcrossref\b/, canonical: 'CrossRef' }
+      ];
+
+      for (const alias of aliases) {
+        if (alias.re.test(normalized)) return alias.canonical;
+      }
+      if (/\bpublisher\b/.test(normalized) && /\b(site|website)\b/.test(normalized)) return "Publisher's own site";
+      if (/\bjournal\b/.test(normalized) && /\b(site|website)\b/.test(normalized)) return 'Journal website';
+      return smartTitle(cleaned);
+    }
+
+    function getDepositPolicyTerms(value) {
+      const terms = toValueList(value).map(normalizeDepositPolicyTerm).filter(Boolean);
       return [...new Set(terms)];
     }
 
@@ -561,11 +663,11 @@
         .sort((a, b) => formatCountry(a).localeCompare(formatCountry(b)));
       const licenses = Array.from(new Set(state.records.flatMap(r => toValueList(r.license_type))))
         .sort((a, b) => String(a).localeCompare(String(b)));
-      const peerReviews = Array.from(new Set(state.records.flatMap(r => getSimpleTerms(r.peer_review_type))))
+      const peerReviews = Array.from(new Set(state.records.flatMap(r => getPeerReviewTerms(r.peer_review_type))))
         .sort((a, b) => String(a).localeCompare(String(b)));
       const preservations = Array.from(new Set(state.records.flatMap(r => getPreservationTerms(r.preservation_service))))
         .sort((a, b) => String(a).localeCompare(String(b)));
-      const depositPolicyDirectories = Array.from(new Set(state.records.flatMap(r => getSimpleTerms(r.deposit_policy_directory))))
+      const depositPolicyDirectories = Array.from(new Set(state.records.flatMap(r => getDepositPolicyTerms(r.deposit_policy_directory))))
         .sort((a, b) => String(a).localeCompare(String(b)));
       const pidSchemes = Array.from(new Set(state.records.flatMap(r => getPidSchemes(r.pid_scheme))))
         .sort((a, b) => String(a).localeCompare(String(b)));
@@ -656,9 +758,9 @@
         if (apc === 'no' && r.apc_has !== false) return false;
         if (author === 'yes' && r.author_retains !== true) return false;
         if (author === 'no' && r.author_retains !== false) return false;
-        if (peerReview && !getSimpleTerms(r.peer_review_type).includes(peerReview)) return false;
+        if (peerReview && !getPeerReviewTerms(r.peer_review_type).includes(peerReview)) return false;
         if (preservation && !getPreservationTerms(r.preservation_service).includes(preservation)) return false;
-        if (depositPolicy && !getSimpleTerms(r.deposit_policy_directory).includes(depositPolicy)) return false;
+        if (depositPolicy && !getDepositPolicyTerms(r.deposit_policy_directory).includes(depositPolicy)) return false;
         if (pid && !getPidSchemes(r.pid_scheme).includes(pid)) return false;
         if (language && !getSimpleTerms(r.language).includes(language)) return false;
         if (publisher && !(r.publisher || '').toLowerCase().includes(publisher)) return false;
