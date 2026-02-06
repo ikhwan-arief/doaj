@@ -101,6 +101,10 @@
       box-shadow: var(--shadow);
       min-height: 280px;
     }
+    .chart-box.stack {
+      grid-column: 1 / -1;
+      min-height: 360px;
+    }
     .table-box {
       margin: 18px 28px 40px;
       background: var(--card);
@@ -226,10 +230,10 @@
     </div>
 
     <div class="charts">
-      <div class="chart-box" id="chart-country"></div>
+      <div class="chart-box stack" id="chart-country"></div>
+      <div class="chart-box stack" id="chart-subjects"></div>
       <div class="chart-box" id="chart-license"></div>
       <div class="chart-box" id="chart-apc"></div>
-      <div class="chart-box" id="chart-subjects"></div>
       <div class="chart-box" id="chart-timeline"></div>
     </div>
   </div>
@@ -266,6 +270,7 @@
       meta: {},
       yearBounds: null
     };
+    const NOT_AVAILABLE = 'Not available';
     const countryNameFormatter = (typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined')
       ? new Intl.DisplayNames([navigator.language || 'en', 'en'], { type: 'region' })
       : null;
@@ -306,9 +311,9 @@
     }
 
     function formatPidScheme(value) {
-      if (!value) return '—';
+      if (!value) return NOT_AVAILABLE;
       const raw = String(value).trim();
-      if (!raw) return '—';
+      if (!raw) return NOT_AVAILABLE;
       if (/^[a-z0-9_-]+$/i.test(raw)) return raw.toUpperCase();
       return raw;
     }
@@ -320,7 +325,7 @@
     }
 
     function formatCountry(country) {
-      if (!country) return '—';
+      if (!country) return NOT_AVAILABLE;
       const raw = String(country).trim();
       const cleaned = raw.replace(/_/g, ' ');
       const upper = cleaned.toUpperCase();
@@ -570,7 +575,7 @@
         }],
         {
           title:'Top countries',
-          margin:{l:180,r:10,t:40,b:40},
+          margin:{l:260,r:12,t:46,b:48},
           paper_bgcolor:'rgba(0,0,0,0)',
           plot_bgcolor:'rgba(0,0,0,0)',
           font:{color:'#F6F4F4'},
@@ -586,11 +591,12 @@
       Plotly.newPlot('chart-license', [{type:'pie', hole:0.45, labels: licEntries.map(d=>d[0]), values: licEntries.map(d=>d[1]), marker:{colors:['#FD5A3B','#FA9A87','#47A178','#3A5959','#A3C386','#F9D950']}}], {title:'License mix', paper_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
 
       // APC yes/no
-      const apcCounts = {yes:0, no:0, unknown:0};
+      const apcCounts = {yes:0, no:0};
       for (const r of state.filtered) {
-        if (r.apc_has === true) apcCounts.yes++; else if (r.apc_has === false) apcCounts.no++; else apcCounts.unknown++;
+        if (r.apc_has === true) apcCounts.yes++;
+        else if (r.apc_has === false) apcCounts.no++;
       }
-      Plotly.newPlot('chart-apc', [{type:'bar', x:['Yes','No','Unknown'], y:[apcCounts.yes, apcCounts.no, apcCounts.unknown], marker:{color:['#FD5A3B','#47A178','#5C5956']}}], {title:'APC presence', margin:{l:40,r:10,t:40,b:40}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
+      Plotly.newPlot('chart-apc', [{type:'bar', x:['Yes','No'], y:[apcCounts.yes, apcCounts.no], marker:{color:['#FD5A3B','#47A178']}}], {title:'APC presence', margin:{l:40,r:10,t:40,b:40}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#F6F4F4'}}, {displayModeBar:false});
 
       // Subjects top 12
       const subjCounts = {};
@@ -609,7 +615,7 @@
         }],
         {
           title:'Subjects (top 12)',
-          margin:{l:240,r:10,t:40,b:40},
+          margin:{l:320,r:12,t:46,b:48},
           paper_bgcolor:'rgba(0,0,0,0)',
           plot_bgcolor:'rgba(0,0,0,0)',
           font:{color:'#F6F4F4'},
@@ -671,18 +677,18 @@
         return;
       }
       for (const r of rows) {
-        const preservationText = toValueList(r.preservation_service).join(', ') || '—';
-        const pidText = toValueList(r.pid_scheme).map(formatPidScheme).join(', ') || '—';
+        const preservationText = toValueList(r.preservation_service).join(', ') || NOT_AVAILABLE;
+        const pidText = toValueList(r.pid_scheme).map(formatPidScheme).join(', ') || NOT_AVAILABLE;
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${r.title || '—'}</td>
-          <td>${r.publisher || '—'}</td>
+          <td>${r.title || NOT_AVAILABLE}</td>
+          <td>${r.publisher || NOT_AVAILABLE}</td>
           <td>${formatCountry(r.country)}</td>
-          <td>${r.license_type || '—'}</td>
-          <td>${r.apc_has === true ? '<span class="pill">Yes</span>' : r.apc_has === false ? '<span class="pill negative">No</span>' : '—'}</td>
+          <td>${r.license_type || NOT_AVAILABLE}</td>
+          <td>${r.apc_has === true ? '<span class="pill">Yes</span>' : r.apc_has === false ? '<span class="pill negative">No</span>' : NOT_AVAILABLE}</td>
           <td>${preservationText}</td>
           <td>${pidText}</td>
-          <td>${formatDate(r.created_date)}</td>
+          <td>${r.created_date ? formatDate(r.created_date) : NOT_AVAILABLE}</td>
         `;
         tbody.appendChild(tr);
       }
