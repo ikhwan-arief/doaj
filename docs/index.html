@@ -106,15 +106,21 @@
     .chart-box.map-box { min-height: 500px; }
     .map-shell { position: relative; }
     .map-plot { min-height: 460px; width: 100%; }
-    #chart-country-map:fullscreen {
+    #chart-country-map-shell:fullscreen {
       width: 100vw;
       height: 100vh;
       background: var(--bg);
     }
-    #chart-country-map:-webkit-full-screen {
+    #chart-country-map-shell:-webkit-full-screen {
       width: 100vw;
       height: 100vh;
       background: var(--bg);
+    }
+    #chart-country-map-shell:fullscreen .map-plot {
+      height: 100%;
+    }
+    #chart-country-map-shell:-webkit-full-screen .map-plot {
+      height: 100%;
     }
     .map-fullscreen-btn {
       position: absolute;
@@ -133,6 +139,26 @@
       box-shadow: 0 6px 14px rgba(40, 38, 36, 0.1);
     }
     .map-fullscreen-btn:hover { background: #F6F4F4; }
+    .map-fullscreen-footer {
+      display: none;
+      position: absolute;
+      right: 12px;
+      bottom: 10px;
+      z-index: 12;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 10px;
+      font-weight: 500;
+      text-align: right;
+      pointer-events: none;
+    }
+    #chart-country-map-shell:fullscreen .map-fullscreen-footer,
+    #chart-country-map-shell:-webkit-full-screen .map-fullscreen-footer {
+      display: block;
+    }
     .table-box {
       margin: 18px 28px 40px;
       background: var(--card);
@@ -342,6 +368,10 @@
 
     <div class="charts">
       <div class="chart-row">
+        <div class="chart-box" id="chart-apc-overview"></div>
+        <div class="chart-box" id="chart-author-retains"></div>
+      </div>
+      <div class="chart-row">
         <div class="chart-box" id="chart-country"></div>
         <div class="chart-box" id="chart-continent"></div>
       </div>
@@ -363,8 +393,9 @@
       </div>
       <div class="chart-row single">
         <div class="chart-box map-box map-shell" id="chart-country-map-shell">
-          <button id="map-fullscreen-btn" class="map-fullscreen-btn" type="button">Zoom</button>
+          <button id="map-fullscreen-btn" class="map-fullscreen-btn" type="button">Full page map</button>
           <div id="chart-country-map" class="map-plot"></div>
+          <div class="map-fullscreen-footer">&copy; Ikhwan Arief, Universitas Andalas - CC BY-NC-SA - Data source DOAJ</div>
         </div>
       </div>
     </div>
@@ -382,8 +413,7 @@
     </div>
     <div class="table-search">
       <label for="search-query">Search (title, country, subject)</label>
-      <input id="search-query" list="search-suggestions" type="text" placeholder="Start typing..." />
-      <datalist id="search-suggestions"></datalist>
+      <input id="search-query" type="text" placeholder="Start typing..." autocomplete="off" />
     </div>
     <table>
       <thead>
@@ -1062,24 +1092,6 @@
       state.searchTerms = [...terms].sort((a, b) => a.localeCompare(b));
     }
 
-    function updateSearchSuggestions(inputValue) {
-      const list = document.getElementById('search-suggestions');
-      if (!list) return;
-      list.innerHTML = '';
-      const query = String(inputValue || '').trim().toLowerCase();
-      if (!query) return;
-
-      let added = 0;
-      for (const term of state.searchTerms) {
-        if (!term.toLowerCase().includes(query)) continue;
-        const option = document.createElement('option');
-        option.value = term;
-        list.appendChild(option);
-        added += 1;
-        if (added >= 30) break;
-      }
-    }
-
     function renderHorizontalBarChart(targetId, title, entries, opts = {}) {
       if (!entries.length) {
         Plotly.newPlot(
@@ -1131,6 +1143,54 @@
           font: { color: '#282624' },
           xaxis: { tickformat: ',d', separatethousands: true, range: [0, maxValue + xPad] },
           yaxis: { automargin: true, ticklabelstandoff: 12, ticks: 'outside', ticklen: 4 }
+        },
+        { displayModeBar: false }
+      );
+    }
+
+    function renderYesNoPieChart(targetId, title, yesCount, noCount, opts = {}) {
+      const yes = Number(yesCount) || 0;
+      const no = Number(noCount) || 0;
+      const total = yes + no;
+
+      if (total <= 0) {
+        Plotly.newPlot(
+          targetId,
+          [],
+          {
+            title,
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#282624' },
+            xaxis: { visible: false },
+            yaxis: { visible: false },
+            annotations: [{ text: 'No data yet', showarrow: false, xref: 'paper', yref: 'paper', x: 0.5, y: 0.5 }]
+          },
+          { displayModeBar: false }
+        );
+        return;
+      }
+
+      Plotly.newPlot(
+        targetId,
+        [{
+          type: 'pie',
+          labels: ['Yes', 'No'],
+          values: [yes, no],
+          sort: false,
+          textinfo: 'label+value',
+          marker: { colors: [opts.yesColor || '#47A178', opts.noColor || '#FD5A3B'] },
+          hovertemplate: '%{label}: %{value:,d} (%{percent})<extra></extra>',
+          textfont: { color: '#282624', size: 13 }
+        }],
+        {
+          title,
+          margin: { l: 12, r: 12, t: 46, b: 22 },
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          font: { color: '#282624' },
+          showlegend: true,
+          legend: { orientation: 'h', x: 0, y: -0.08 }
         },
         { displayModeBar: false }
       );
@@ -1387,7 +1447,6 @@
       document.querySelectorAll('.filters input[type="text"]').forEach(el => { el.value = ''; });
       const searchEl = document.getElementById('search-query');
       if (searchEl) searchEl.value = '';
-      updateSearchSuggestions('');
       resetYearRange();
       state.filtered = state.records;
       state.tablePage = 1;
@@ -1426,9 +1485,10 @@
 
     function openMapFullscreen() {
       const mapEl = document.getElementById('chart-country-map');
-      if (!mapEl) return;
+      const mapShell = document.getElementById('chart-country-map-shell');
+      if (!mapEl || !mapShell) return;
 
-      const isFullscreen = document.fullscreenElement === mapEl || document.webkitFullscreenElement === mapEl;
+      const isFullscreen = document.fullscreenElement === mapShell || document.webkitFullscreenElement === mapShell;
       if (isFullscreen) {
         const exit = document.exitFullscreen || document.webkitExitFullscreen;
         if (exit) exit.call(document);
@@ -1436,11 +1496,11 @@
       }
 
       const request =
-        mapEl.requestFullscreen ||
-        mapEl.webkitRequestFullscreen ||
-        mapEl.mozRequestFullScreen ||
-        mapEl.msRequestFullscreen;
-      if (request) request.call(mapEl);
+        mapShell.requestFullscreen ||
+        mapShell.webkitRequestFullscreen ||
+        mapShell.mozRequestFullScreen ||
+        mapShell.msRequestFullscreen;
+      if (request) request.call(mapShell);
       setTimeout(resizeMapPlot, 220);
     }
 
@@ -1449,6 +1509,20 @@
         renderEmptyCharts();
         return;
       }
+
+      const apcYes = state.filtered.filter(record => record.apc_has === true).length;
+      const apcNo = state.filtered.filter(record => record.apc_has === false).length;
+      renderYesNoPieChart('chart-apc-overview', 'Article Processing Charges', apcYes, apcNo, {
+        yesColor: '#47A178',
+        noColor: '#FD5A3B'
+      });
+
+      const authorRetainsYes = state.filtered.filter(record => record.author_retains === true).length;
+      const authorRetainsNo = state.filtered.filter(record => record.author_retains === false).length;
+      renderYesNoPieChart('chart-author-retains', 'Authors retain copyright', authorRetainsYes, authorRetainsNo, {
+        yesColor: '#3A5959',
+        noColor: '#FA9A87'
+      });
 
       const countryCounts = {};
       for (const record of state.filtered) {
@@ -1469,7 +1543,7 @@
       }
       const continentEntries = sortedEntries(continentCounts).map(([continent, count]) => [continent, count]);
       const continentColors = continentEntries.map(([continent]) => CONTINENT_COLORS[continent] || CONTINENT_COLORS.Other);
-      renderHorizontalBarChart('chart-continent', 'Journal in Each Continent', continentEntries, { leftMargin: 210, colors: continentColors });
+      renderHorizontalBarChart('chart-continent', 'Journals in each continent', continentEntries, { leftMargin: 210, colors: continentColors });
 
       const languageCounts = countTermFrequency(state.filtered, r => getSimpleTerms(r.language));
       const topLanguages = sortedEntries(languageCounts, 10).map(([term, count]) => [shortLabel(term, 56), count]);
@@ -1505,11 +1579,13 @@
 
       const preservationCounts = countTermFrequency(state.filtered, r => getPreservationTerms(r.preservation_service), true);
       const topPreservation = sortedEntries(preservationCounts, 5);
+      const preservationPalette = ['#3A5959', '#47A178', '#A3C386', '#FD5A3B', '#FA9A87'];
+      const preservationColors = topPreservation.map(([label], idx) => (label === NOT_AVAILABLE ? '#982E0A' : preservationPalette[idx % preservationPalette.length]));
       renderHorizontalBarChart(
         'chart-preservation',
         'Top 5 Preservation Services',
         topPreservation.map(([label, count]) => [shortLabel(label, 58), count]),
-        { leftMargin: 320, color: '#982E0A' }
+        { leftMargin: 320, colors: preservationColors }
       );
 
       const publisherCounts = {};
@@ -1597,9 +1673,12 @@
     }
 
     function renderEmptyCharts() {
+      renderYesNoPieChart('chart-apc-overview', 'Article Processing Charges', 0, 0);
+      renderYesNoPieChart('chart-author-retains', 'Authors retain copyright', 0, 0);
+
       const emptyCharts = [
         ['chart-country', 'Top 10 countries'],
-        ['chart-continent', 'Journal in Each Continent'],
+        ['chart-continent', 'Journals in each continent'],
         ['chart-languages', 'Top 10 languages'],
         ['chart-subjects', 'Top 10 subjects'],
         ['chart-license', 'License usage'],
@@ -1749,11 +1828,9 @@
       const searchEl = document.getElementById('search-query');
       let searchDebounceTimer = null;
       searchEl.addEventListener('input', () => {
-        updateSearchSuggestions(searchEl.value);
         clearTimeout(searchDebounceTimer);
         searchDebounceTimer = setTimeout(() => applyFilters(), 180);
       });
-      searchEl.addEventListener('change', () => updateSearchSuggestions(searchEl.value));
 
       const mapFullscreenBtn = document.getElementById('map-fullscreen-btn');
       if (mapFullscreenBtn) {
