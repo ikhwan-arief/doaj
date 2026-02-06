@@ -55,8 +55,25 @@ def normalize_header(value: str) -> str:
 def split_multi(value: Optional[str]) -> List[str]:
     if not value:
         return []
-    parts = [p.strip() for p in re.split(r"[|;]", value) if p and p.strip()]
-    return [p for p in parts if p]
+    text = value.strip()
+    if not text:
+        return []
+
+    if any(sep in text for sep in ("|", ";", "\n")):
+        parts = [p.strip() for p in re.split(r"[|;\n]+", text) if p and p.strip()]
+    elif "," in text:
+        parts = [p.strip() for p in text.split(",") if p and p.strip()]
+    else:
+        parts = [text]
+
+    # Keep insertion order while removing duplicates.
+    seen = set()
+    unique: List[str] = []
+    for part in parts:
+        if part not in seen:
+            seen.add(part)
+            unique.append(part)
+    return unique
 
 
 def parse_bool(value: Optional[str]) -> Optional[bool]:
@@ -118,10 +135,10 @@ def parse_date(value: Optional[str]) -> Optional[str]:
     return None
 
 
-def parse_license_flags(license_text: Optional[str]) -> Dict[str, Optional[bool]]:
-    if not license_text:
+def parse_license_flags(license_values: Sequence[str]) -> Dict[str, Optional[bool]]:
+    if not license_values:
         return {"BY": None, "NC": None, "ND": None, "SA": None}
-    normalized = license_text.upper().replace("/", " ").replace("-", " ")
+    normalized = " ".join(license_values).upper().replace("/", " ").replace("-", " ")
     has_by = " BY " in f" {normalized} "
     has_nc = " NC " in f" {normalized} "
     has_nd = " ND " in f" {normalized} "
@@ -162,7 +179,7 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
     title = get_value(row, lookup, ["title", "journaltitle", "journal title"])
     publisher = get_value(row, lookup, ["publisher", "publishername"])
     country = get_value(row, lookup, ["country", "countryofpublisher", "journalcountry"])
-    license_type = get_value(row, lookup, ["license", "journallicense", "licensetype", "license terms"])
+    license_type = split_multi(get_value(row, lookup, ["license", "journallicense", "licensetype", "license terms"]))
     license_url = get_value(row, lookup, ["licenseurl", "licensetermsurl"])
 
     apc_raw = get_value(row, lookup, ["apc", "articleprocessingcharges", "journalapc"])
@@ -265,7 +282,15 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
 
 def aggregate(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     country = Counter(r.get("country") for r in records if r.get("country"))
-    license_type = Counter(r.get("license_type") for r in records if r.get("license_type"))
+    license_type = Counter()
+    for record in records:
+        values = record.get("license_type")
+        if isinstance(values, list):
+            for val in values:
+                if val:
+                    license_type[val] += 1
+        elif values:
+            license_type[str(values)] += 1
     apc = Counter("yes" if r.get("apc_has") else "no" for r in records if r.get("apc_has") is not None)
     waiver = Counter("yes" if r.get("waiver_has") else "no" for r in records if r.get("waiver_has") is not None)
     preservation = Counter("yes" if r.get("preservation_has") else "no" for r in records if r.get("preservation_has") is not None)

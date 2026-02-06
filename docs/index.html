@@ -307,7 +307,8 @@
       }
       const text = String(value).trim();
       if (!text) return [];
-      return text.split(/[|;]+/).map(part => part.trim()).filter(Boolean);
+      const parts = text.split(/[|;,\n]+/).map(part => part.trim()).filter(Boolean);
+      return [...new Set(parts)];
     }
 
     function formatPidScheme(value) {
@@ -454,7 +455,8 @@
     function populateFilters() {
       const countries = Array.from(new Set(state.records.map(r => r.country).filter(Boolean)))
         .sort((a, b) => formatCountry(a).localeCompare(formatCountry(b)));
-      const licenses = Array.from(new Set(state.records.map(r => r.license_type).filter(Boolean))).sort();
+      const licenses = Array.from(new Set(state.records.flatMap(r => toValueList(r.license_type))))
+        .sort((a, b) => String(a).localeCompare(String(b)));
       const preservations = Array.from(new Set(state.records.flatMap(r => toValueList(r.preservation_service))))
         .sort((a, b) => String(a).localeCompare(String(b)));
       const pidSchemes = Array.from(new Set(state.records.flatMap(r => toValueList(r.pid_scheme))))
@@ -509,7 +511,7 @@
 
       state.filtered = state.records.filter(r => {
         if (country && r.country !== country) return false;
-        if (license && r.license_type !== license) return false;
+        if (license && !toValueList(r.license_type).includes(license)) return false;
         if (apc === 'yes' && r.apc_has !== true) return false;
         if (apc === 'no' && r.apc_has !== false) return false;
         if (author === 'yes' && r.author_retains !== true) return false;
@@ -586,7 +588,11 @@
 
       // License donut
       const licCounts = {};
-      for (const r of state.filtered) if (r.license_type) licCounts[r.license_type] = (licCounts[r.license_type] || 0) + 1;
+      for (const r of state.filtered) {
+        for (const lic of toValueList(r.license_type)) {
+          licCounts[lic] = (licCounts[lic] || 0) + 1;
+        }
+      }
       const licEntries = Object.entries(licCounts);
       Plotly.newPlot('chart-license', [{type:'pie', hole:0.45, labels: licEntries.map(d=>d[0]), values: licEntries.map(d=>d[1]), marker:{colors:['#FD5A3B','#FA9A87','#47A178','#3A5959','#A3C386','#F9D950']}}], {title:'License mix', paper_bgcolor:'rgba(0,0,0,0)', font:{color:'#282624'}}, {displayModeBar:false});
 
@@ -688,6 +694,7 @@
         return;
       }
       for (const r of rows) {
+        const licenseText = toValueList(r.license_type).join(', ') || NOT_AVAILABLE;
         const preservationText = toValueList(r.preservation_service).join(', ') || NOT_AVAILABLE;
         const pidText = toValueList(r.pid_scheme).map(formatPidScheme).join(', ') || NOT_AVAILABLE;
         const tr = document.createElement('tr');
@@ -695,7 +702,7 @@
           <td>${r.title || NOT_AVAILABLE}</td>
           <td>${r.publisher || NOT_AVAILABLE}</td>
           <td>${formatCountry(r.country)}</td>
-          <td>${r.license_type || NOT_AVAILABLE}</td>
+          <td>${licenseText}</td>
           <td>${r.apc_has === true ? '<span class="pill">Yes</span>' : r.apc_has === false ? '<span class="pill negative">No</span>' : NOT_AVAILABLE}</td>
           <td>${preservationText}</td>
           <td>${pidText}</td>
