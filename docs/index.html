@@ -350,6 +350,7 @@
           <th>Country of publisher</th>
           <th>Subject</th>
           <th>APC</th>
+          <th>APC (max EUR)</th>
           <th>Article records</th>
           <th>Date of inclusion</th>
           <th>Last updated</th>
@@ -375,12 +376,19 @@
       filtered: [],
       aggregates: {},
       meta: {},
+      fxRates: null,
+      fxDate: null,
+      fxSource: null,
       yearBounds: null,
       tablePage: 1,
       tablePageSize: 50,
       searchTerms: []
     };
     const NOT_AVAILABLE = 'Not available';
+    const FX_ENDPOINTS = [
+      'https://api.frankfurter.app/latest?from=EUR',
+      'https://open.er-api.com/v6/latest/EUR'
+    ];
     const countryNameFormatter = (typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined')
       ? new Intl.DisplayNames([navigator.language || 'en', 'en'], { type: 'region' })
       : null;
@@ -886,6 +894,83 @@
       return match ? Number(match[0]) : null;
     }
 
+    function normalizeCurrencyCode(value) {
+      if (value === null || value === undefined) return '';
+      const text = String(value).trim().toUpperCase();
+      const match = text.match(/\b([A-Z]{3})\b/);
+      return match ? match[1] : '';
+    }
+
+    function parseApcRawEntries(rawValue) {
+      if (!rawValue) return [];
+      const segments = String(rawValue).split(/[;\n|]+/).map(part => part.trim()).filter(Boolean);
+      const entries = [];
+      for (const segment of segments) {
+        const compact = segment.replace(/(\d)\s+(?=\d)/g, '$1');
+        const amountMatch = compact.replace(/,/g, '').match(/-?\d+(\.\d+)?/);
+        const currencyCode = normalizeCurrencyCode(segment);
+        if (!amountMatch || !currencyCode) continue;
+        const amount = Number(amountMatch[0]);
+        if (!Number.isFinite(amount)) continue;
+        entries.push({ amount, currency: currencyCode });
+      }
+      return entries;
+    }
+
+    function getApcAmountEntries(record) {
+      if (!record) return [];
+      const fromStructured = Array.isArray(record.apc_amounts)
+        ? record.apc_amounts
+            .map(item => {
+              const amount = Number(item && item.amount);
+              const currency = normalizeCurrencyCode(item && item.currency);
+              if (!Number.isFinite(amount) || !currency) return null;
+              return { amount, currency };
+            })
+            .filter(Boolean)
+        : [];
+      if (fromStructured.length) return fromStructured;
+
+      const fromRaw = parseApcRawEntries(record.apc_amount_raw);
+      if (fromRaw.length) return fromRaw;
+
+      const fallbackAmount = Number(record.apc_max_price);
+      const fallbackCurrency = normalizeCurrencyCode(record.apc_max_currency);
+      if (Number.isFinite(fallbackAmount) && fallbackCurrency) {
+        return [{ amount: fallbackAmount, currency: fallbackCurrency }];
+      }
+      return [];
+    }
+
+    function convertToEur(amount, currency) {
+      if (!Number.isFinite(amount)) return null;
+      const code = normalizeCurrencyCode(currency);
+      if (!code) return null;
+      if (code === 'EUR') return amount;
+      if (!state.fxRates || !Object.prototype.hasOwnProperty.call(state.fxRates, code)) return null;
+      const rate = Number(state.fxRates[code]);
+      if (!Number.isFinite(rate) || rate <= 0) return null;
+      return amount / rate;
+    }
+
+    function getMaxApcEur(record) {
+      if (!record || record.apc_has !== true) return null;
+      const entries = getApcAmountEntries(record);
+      if (!entries.length) return null;
+      let maxEur = null;
+      for (const entry of entries) {
+        const eurAmount = convertToEur(entry.amount, entry.currency);
+        if (!Number.isFinite(eurAmount)) continue;
+        if (maxEur === null || eurAmount > maxEur) maxEur = eurAmount;
+      }
+      return maxEur;
+    }
+
+    function formatEuroWhole(value) {
+      if (!Number.isFinite(value)) return '0';
+      return `EUR ${Math.round(value).toLocaleString()}`;
+    }
+
     function isOverOneMonth(record) {
       if (!record || !record.created_date) return false;
       const created = new Date(record.created_date);
@@ -1111,6 +1196,48 @@
       setStatus('');
       populateFilters();
       renderAll();
+    }
+
+    function parseFxPayload(payload) {
+      if (!payload || typeof payload !== 'object') return null;
+      const base = String(payload.base || payload.base_code || '').trim().toUpperCase();
+      const rates = payload.rates;
+      if (base !== 'EUR' || !rates || typeof rates !== 'object') return null;
+
+      const normalizedRates = { EUR: 1 };
+      for (const [key, rawValue] of Object.entries(rates)) {
+        const code = normalizeCurrencyCode(key);
+        const rate = Number(rawValue);
+        if (!code || !Number.isFinite(rate) || rate <= 0) continue;
+        normalizedRates[code] = rate;
+      }
+
+      if (Object.keys(normalizedRates).length < 2) return null;
+      const fxDate = payload.date || payload.time_last_update_utc || null;
+      return { rates: normalizedRates, fxDate };
+    }
+
+    async function loadFxRates() {
+      state.fxRates = null;
+      state.fxDate = null;
+      state.fxSource = null;
+
+      for (const endpoint of FX_ENDPOINTS) {
+        try {
+          const res = await fetch(endpoint, { cache: 'no-store' });
+          if (!res.ok) continue;
+          const payload = await res.json();
+          const parsed = parseFxPayload(payload);
+          if (!parsed) continue;
+          state.fxRates = parsed.rates;
+          state.fxDate = parsed.fxDate;
+          state.fxSource = endpoint;
+          return true;
+        } catch (_err) {
+          // Try next endpoint.
+        }
+      }
+      return false;
     }
 
     function populateFilters() {
@@ -1451,7 +1578,7 @@
       if (!rows.length) {
         const tr = document.createElement('tr');
         const td = document.createElement('td');
-        td.colSpan = 7;
+        td.colSpan = 8;
         td.className = 'muted';
         td.textContent = 'No journal data available yet.';
         tr.appendChild(td);
@@ -1497,6 +1624,11 @@
           apcCell.textContent = NOT_AVAILABLE;
         }
         tr.appendChild(apcCell);
+
+        const apcEurCell = document.createElement('td');
+        const maxApcEur = getMaxApcEur(record);
+        apcEurCell.textContent = maxApcEur === null ? '0' : formatEuroWhole(maxApcEur);
+        tr.appendChild(apcEurCell);
 
         const articleCell = document.createElement('td');
         const articleValue = getArticleRecords(record);
@@ -1574,6 +1706,10 @@
       try {
         wireEvents();
         await loadData();
+        if (state.records.length) {
+          await loadFxRates();
+          renderTable();
+        }
       } catch (err) {
         console.error(err);
         state.records = [];

@@ -396,6 +396,39 @@ def parse_float(value: Optional[str]) -> Optional[float]:
         return None
 
 
+def parse_apc_amount_number(segment: str) -> Optional[float]:
+    # Remove spacing inside numbers so values like "7 500 USD" parse correctly.
+    compact = re.sub(r"(?<=\d)\s+(?=\d)", "", segment)
+    return parse_float(compact)
+
+
+def parse_apc_amount_entries(value: Optional[str]) -> List[Dict[str, Any]]:
+    if not value:
+        return []
+
+    entries: List[Dict[str, Any]] = []
+    for raw_part in re.split(r"[;\n|]+", value):
+        part = raw_part.strip()
+        if not part:
+            continue
+
+        amount = parse_apc_amount_number(part)
+        currency_match = re.search(r"\b([A-Z]{3})\b", part.upper())
+        currency = currency_match.group(1) if currency_match else None
+        if amount is None or not currency:
+            continue
+
+        entries.append(
+            {
+                "amount": amount,
+                "currency": currency,
+                "raw": part,
+            }
+        )
+
+    return entries
+
+
 def parse_int(value: Optional[str]) -> Optional[int]:
     if value is None:
         return None
@@ -491,8 +524,17 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
     license_url = get_value(row, lookup, ["licenseurl", "licensetermsurl"])
 
     apc_raw = get_value(row, lookup, ["apc", "articleprocessingcharges", "journalapc"])
-    apc_price = parse_float(get_value(row, lookup, ["apcamount", "apcmax", "maximumapc", "maxapc"]))
-    apc_currency = get_value(row, lookup, ["apccurrency", "currency"])
+    apc_amount_raw = get_value(row, lookup, ["apcamount", "apcmax", "maximumapc", "maxapc"])
+    apc_amounts = parse_apc_amount_entries(apc_amount_raw)
+    apc_price = None
+    apc_currency = None
+    if apc_amounts:
+        max_entry = max(apc_amounts, key=lambda item: item.get("amount", 0) or 0)
+        apc_price = max_entry.get("amount")
+        apc_currency = max_entry.get("currency")
+    else:
+        apc_price = parse_float(apc_amount_raw)
+        apc_currency = get_value(row, lookup, ["apccurrency", "currency"])
     apc_has = parse_bool(apc_raw)
 
     author_retains = parse_bool(
@@ -572,6 +614,8 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
         "pissn": issn_print,
         "eissn": issn_online,
         "apc_has": apc_has,
+        "apc_amount_raw": apc_amount_raw,
+        "apc_amounts": apc_amounts,
         "apc_max_price": apc_price,
         "apc_max_currency": apc_currency,
         "waiver_has": parse_bool(get_value(row, lookup, ["waiver", "waiverpolicy", "waiveravailable"])),
