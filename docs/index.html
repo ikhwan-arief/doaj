@@ -428,11 +428,11 @@
   <div id="status-banner" class="status-banner hidden"></div>
 
   <div class="card-grid" id="kpi-cards">
-    <div class="card"><div class="label"><span class="icon-chip"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" /></svg></span>Journals</div><div class="value" id="kpi-journals">–</div></div>
-    <div class="card"><div class="label"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M4 11l4-4 4 4 4-4 4 4"/></svg></span>Country</div><div class="value" id="kpi-countries">–</div></div>
-    <div class="card"><div class="label"><span class="icon-chip success"><svg viewBox="0 0 24 24"><path d="M3 12h6l3-7 3 14 3-7h3"/></svg></span>Articles</div><div class="value" id="kpi-articles">–</div></div>
-    <div class="card"><div class="label"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 8h14M5 12h10M5 16h6"/></svg></span>Languages</div><div class="value" id="kpi-languages">–</div></div>
-    <div class="card"><div class="label"><span class="icon-chip muted"><svg viewBox="0 0 24 24"><path d="M4 12h10a4 4 0 0 1 0 8H4zm0 0V6a4 4 0 0 1 8 0v6"/></svg></span>No APC</div><div class="value" id="kpi-no-apc">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M6 5h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM6 9h11M6 14h11"/></svg></span>Journals</div><div class="value" id="kpi-journals">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M3 12h18M12 3a15 15 0 0 0 0 18M12 3a15 15 0 0 1 0 18"/></svg></span>Country</div><div class="value" id="kpi-countries">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip success"><svg viewBox="0 0 24 24"><path d="M6 4h9l3 3v13H6z"/><path d="M9 11h6M9 15h6M9 7h3"/></svg></span>Articles</div><div class="value" id="kpi-articles">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 8h14M5 12h10M5 16h6"/><path d="M15 5.5 17 7M13 18l2 1.5"/></svg></span>Languages</div><div class="value" id="kpi-languages">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip muted"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M8 12h5m2 0 2-2"/><path d="M5 5l14 14"/></svg></span>No APC</div><div class="value" id="kpi-no-apc">–</div></div>
   </div>
 
   <div class="layout">
@@ -511,71 +511,71 @@
 
     <div class="charts">
       <div class="chart-row">
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip success"><svg viewBox="0 0 24 24"><path d="M4 12h16M4 12l4-4m-4 4 4 4"/></svg></span>Article Processing Charges</div>
-        <div class="chart-content" id="chart-apc-overview"></div>
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip success"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="6" ry="3"/><path d="M6 7v6c0 1.7 12 1.7 12 0V7M6 13c0 1.7 12 1.7 12 0"/></svg></span>Article Processing Charges</div>
+          <div class="chart-content" id="chart-apc-overview"></div>
+        </div>
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M14 14a3 3 0 1 1 0-4"/></svg></span>Authors retain copyright</div>
+          <div class="chart-content" id="chart-author-retains"></div>
+        </div>
       </div>
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M12 4v8l4 4"/></svg></span>Authors retain copyright</div>
-        <div class="chart-content" id="chart-author-retains"></div>
+      <div class="chart-row">
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 19h14M7 16v-6M12 19V8M17 19v-9"/></svg></span>Top 10 countries</div>
+          <div class="chart-content" id="chart-country"></div>
+        </div>
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M3 12h18M12 3a14 14 0 0 0 0 18M12 3a14 14 0 0 1 0 18"/></svg></span>Journals in each continent</div>
+          <div class="chart-content" id="chart-continent"></div>
+        </div>
       </div>
-    </div>
-    <div class="chart-row">
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 20l4-12 4 8 4-10 4 14"/></svg></span>Top 10 countries</div>
-        <div class="chart-content" id="chart-country"></div>
+      <div class="chart-row">
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 5h14v9H8l-3 3z"/></svg></span>Top 10 languages</div>
+          <div class="chart-content" id="chart-languages"></div>
+        </div>
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M7 4h10v14l-5-3-5 3z"/></svg></span>Top 10 subjects</div>
+          <div class="chart-content" id="chart-subjects"></div>
+        </div>
       </div>
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M12 3l7 4v10l-7 4-7-4V7z"/></svg></span>Journals in each continent</div>
-        <div class="chart-content" id="chart-continent"></div>
+      <div class="chart-row">
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="4"/><path d="M9 14 7 20l5-2 5 2-2-6"/></svg></span>License usage</div>
+          <div class="chart-content" id="chart-license"></div>
+        </div>
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M12 4l7 3v4c0 4-3 7-7 9-4-2-7-5-7-9V7z"/><path d="M9 11l2 2 4-4"/></svg></span>Top 5 peer-review type</div>
+          <div class="chart-content" id="chart-peer-review"></div>
+        </div>
       </div>
-    </div>
-    <div class="chart-row">
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 5h14M5 12h10M5 19h6"/></svg></span>Top 10 languages</div>
-        <div class="chart-content" id="chart-languages"></div>
+      <div class="chart-row">
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M10 14 7.5 16.5a3.5 3.5 0 0 0 5 5l2.5-2.5"/><path d="M14 10l2.5-2.5a3.5 3.5 0 0 0-5-5L9 5"/></svg></span>Top 5 Persistent Identifiers</div>
+          <div class="chart-content" id="chart-pid"></div>
+        </div>
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 7h16v3H4z"/><path d="M6 10v7h12v-7"/><path d="M10 13h4"/></svg></span>Top 5 Preservation Services</div>
+          <div class="chart-content" id="chart-preservation"></div>
+        </div>
       </div>
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 6h16M6 10h12M8 14h8M10 18h4"/></svg></span>Top 10 subjects</div>
-        <div class="chart-content" id="chart-subjects"></div>
+      <div class="chart-row">
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M6 20h12V6H6z"/><path d="M9 10h2v2H9zM13 10h2v2h-2zM9 14h2v2H9zM13 14h2v2h-2z"/></svg></span>Top 10 publishers</div>
+          <div class="chart-content" id="chart-publishers"></div>
+        </div>
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 17h14"/><path d="M7 14l3-4 3 3 4-6"/></svg></span>Timeline of journals added to DOAJ (monthly)</div>
+          <div class="chart-content" id="chart-timeline"></div>
+        </div>
       </div>
-    </div>
-    <div class="chart-row">
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h10"/></svg></span>License usage</div>
-        <div class="chart-content" id="chart-license"></div>
-      </div>
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M12 4v6l4 2"/></svg></span>Top 5 peer-review type</div>
-        <div class="chart-content" id="chart-peer-review"></div>
-      </div>
-    </div>
-    <div class="chart-row">
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></svg></span>Top 5 Persistent Identifiers</div>
-        <div class="chart-content" id="chart-pid"></div>
-      </div>
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 12l4-4 4 4 4-4 4 4"/></svg></span>Top 5 Preservation Services</div>
-        <div class="chart-content" id="chart-preservation"></div>
-      </div>
-    </div>
-    <div class="chart-row">
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 18h16M6 10h12M8 6h8"/></svg></span>Top 10 publishers</div>
-        <div class="chart-content" id="chart-publishers"></div>
-      </div>
-      <div class="chart-box">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 19l4-6 4 3 4-8 4 6"/></svg></span>Timeline of journals added to DOAJ (monthly)</div>
-        <div class="chart-content" id="chart-timeline"></div>
-      </div>
-    </div>
       <div class="chart-row single">
-      <div class="chart-box apc-country-box">
-        <div class="box-header"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M4 12h16M4 12l4-4m-4 4 4 4"/></svg></span>Top 20 countries by APC amount</div>
-        <div class="apc-country-control">
-          <div class="apc-country-control-group">
-            <label for="apc-country-continent">Continent</label>
+        <div class="chart-box apc-country-box">
+          <div class="box-header"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M5 19h14"/><path d="M8 16v-5M12 19V8M16 19v-7"/><path d="M11 5h4M13 3v4"/></svg></span>Top 20 countries by APC amount</div>
+          <div class="apc-country-control">
+            <div class="apc-country-control-group">
+              <label for="apc-country-continent">Continent</label>
             <select id="apc-country-continent">
               <option value="">All continents</option>
               <option value="Africa">Africa</option>
@@ -596,13 +596,13 @@
         </div>
         <div class="chart-content" id="chart-apc-distribution"></div>
       </div>
-    </div>
-    <div class="chart-row single">
-      <div class="chart-box map-box map-shell" id="chart-country-map-shell">
-        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0zm9-9v3m0 12v3m9-9h-3M6 12H3m12.5-5.5L12 9m0 0-3.5-2.5M12 9v6"/></svg></span>Country of Publishers</div>
-        <button id="map-fullscreen-btn" class="map-fullscreen-btn" type="button">Full page map</button>
-        <div id="map-continent-legend" class="map-continent-legend"></div>
-        <div id="chart-country-map" class="map-plot"></div>
+      </div>
+      <div class="chart-row single">
+        <div class="chart-box map-box map-shell" id="chart-country-map-shell">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M3 12h18M12 3a14 14 0 0 0 0 18M12 3a14 14 0 0 1 0 18"/><path d="M14.5 13.5 17 16"/></svg></span>Country of Publishers</div>
+          <button id="map-fullscreen-btn" class="map-fullscreen-btn" type="button">Full page map</button>
+          <div id="map-continent-legend" class="map-continent-legend"></div>
+          <div id="chart-country-map" class="map-plot"></div>
           <div class="map-fullscreen-footer">&copy; Ikhwan Arief, Universitas Andalas - CC BY-NC-SA - Data source DOAJ</div>
         </div>
       </div>
