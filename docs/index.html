@@ -59,6 +59,26 @@
     @media (max-width: 960px) {
       .layout { grid-template-columns: 1fr; }
     }
+    .icon-chip {
+      width: 26px;
+      height: 26px;
+      border-radius: 10px;
+      background: rgba(40, 38, 36, 0.06);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 26px;
+    }
+    .icon-chip.accent { background: rgba(253, 90, 59, 0.16); }
+    .icon-chip.success { background: rgba(71, 161, 120, 0.16); }
+    .icon-chip.muted { background: rgba(92, 89, 86, 0.12); }
+    .icon-chip svg {
+      width: 14px;
+      height: 14px;
+      stroke: var(--text);
+      stroke-width: 1.7;
+      fill: none;
+    }
     .panel, .card {
       background: var(--card);
       border: 1px solid var(--border);
@@ -75,7 +95,15 @@
     .card {
       padding: 14px 16px;
     }
-    .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .card .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
     .card .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
     .filters h3 { margin: 0 0 12px; }
     .filter-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
@@ -110,7 +138,18 @@
       padding: 10px;
       box-shadow: var(--shadow);
       min-height: 320px;
+      position: relative;
     }
+    .box-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      padding: 4px 4px 8px;
+    }
+    .chart-content { min-height: 260px; }
+    .chart-box .gtitle { display: none !important; }
+    .chart-box .svg-container { padding-top: 0 !important; }
     .apc-country-box { display: flex; flex-direction: column; }
     .apc-country-control {
       display: flex;
@@ -384,11 +423,11 @@
   <div id="status-banner" class="status-banner hidden"></div>
 
   <div class="card-grid" id="kpi-cards">
-    <div class="card"><div class="label">Journals</div><div class="value" id="kpi-journals">–</div></div>
-    <div class="card"><div class="label">Country</div><div class="value" id="kpi-countries">–</div></div>
-    <div class="card"><div class="label">Articles</div><div class="value" id="kpi-articles">–</div></div>
-    <div class="card"><div class="label">Languages</div><div class="value" id="kpi-languages">–</div></div>
-    <div class="card"><div class="label">No APC</div><div class="value" id="kpi-no-apc">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" /></svg></span>Journals</div><div class="value" id="kpi-journals">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M4 11l4-4 4 4 4-4 4 4"/></svg></span>Country</div><div class="value" id="kpi-countries">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip success"><svg viewBox="0 0 24 24"><path d="M3 12h6l3-7 3 14 3-7h3"/></svg></span>Articles</div><div class="value" id="kpi-articles">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 8h14M5 12h10M5 16h6"/></svg></span>Languages</div><div class="value" id="kpi-languages">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip muted"><svg viewBox="0 0 24 24"><path d="M4 12h10a4 4 0 0 1 0 8H4zm0 0V6a4 4 0 0 1 8 0v6"/></svg></span>No APC</div><div class="value" id="kpi-no-apc">–</div></div>
   </div>
 
   <div class="layout">
@@ -462,60 +501,98 @@
 
     <div class="charts">
       <div class="chart-row">
-        <div class="chart-box" id="chart-apc-overview"></div>
-        <div class="chart-box" id="chart-author-retains"></div>
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip success"><svg viewBox="0 0 24 24"><path d="M4 12h16M4 12l4-4m-4 4 4 4"/></svg></span>Article Processing Charges</div>
+        <div class="chart-content" id="chart-apc-overview"></div>
       </div>
-      <div class="chart-row">
-        <div class="chart-box" id="chart-country"></div>
-        <div class="chart-box" id="chart-continent"></div>
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M12 4v8l4 4"/></svg></span>Authors retain copyright</div>
+        <div class="chart-content" id="chart-author-retains"></div>
       </div>
-      <div class="chart-row">
-        <div class="chart-box" id="chart-languages"></div>
-        <div class="chart-box" id="chart-subjects"></div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 20l4-12 4 8 4-10 4 14"/></svg></span>Top 10 countries</div>
+        <div class="chart-content" id="chart-country"></div>
       </div>
-      <div class="chart-row">
-        <div class="chart-box" id="chart-license"></div>
-        <div class="chart-box" id="chart-peer-review"></div>
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M12 3l7 4v10l-7 4-7-4V7z"/></svg></span>Journals in each continent</div>
+        <div class="chart-content" id="chart-continent"></div>
       </div>
-      <div class="chart-row">
-        <div class="chart-box" id="chart-pid"></div>
-        <div class="chart-box" id="chart-preservation"></div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 5h14M5 12h10M5 19h6"/></svg></span>Top 10 languages</div>
+        <div class="chart-content" id="chart-languages"></div>
       </div>
-      <div class="chart-row">
-        <div class="chart-box" id="chart-publishers"></div>
-        <div class="chart-box" id="chart-timeline"></div>
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 6h16M6 10h12M8 14h8M10 18h4"/></svg></span>Top 10 subjects</div>
+        <div class="chart-content" id="chart-subjects"></div>
       </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h10"/></svg></span>License usage</div>
+        <div class="chart-content" id="chart-license"></div>
+      </div>
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M12 4v6l4 2"/></svg></span>Top 5 peer-review type</div>
+        <div class="chart-content" id="chart-peer-review"></div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></svg></span>Top 5 Persistent Identifiers</div>
+        <div class="chart-content" id="chart-pid"></div>
+      </div>
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 12l4-4 4 4 4-4 4 4"/></svg></span>Top 5 Preservation Services</div>
+        <div class="chart-content" id="chart-preservation"></div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 18h16M6 10h12M8 6h8"/></svg></span>Top 10 publishers</div>
+        <div class="chart-content" id="chart-publishers"></div>
+      </div>
+      <div class="chart-box">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M4 19l4-6 4 3 4-8 4 6"/></svg></span>Timeline of journals added to DOAJ (monthly)</div>
+        <div class="chart-content" id="chart-timeline"></div>
+      </div>
+    </div>
       <div class="chart-row single">
-        <div class="chart-box apc-country-box">
-          <div class="apc-country-control">
-            <div class="apc-country-control-group">
-              <label for="apc-country-continent">Continent</label>
-              <select id="apc-country-continent">
-                <option value="">All continents</option>
-                <option value="Africa">Africa</option>
-                <option value="Asia">Asia</option>
-                <option value="Europe">Europe</option>
-                <option value="North America">North America</option>
-                <option value="South America">South America</option>
-                <option value="Oceania">Oceania</option>
-              </select>
-            </div>
-            <div class="apc-country-control-group">
-              <label for="apc-currency">Currency</label>
-              <select id="apc-currency">
-                <option value="EUR">EUR</option>
-                <option value="USD">USD</option>
-              </select>
-            </div>
+      <div class="chart-box apc-country-box">
+        <div class="box-header"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M4 12h16M4 12l4-4m-4 4 4 4"/></svg></span>Top 20 countries by APC amount</div>
+        <div class="apc-country-control">
+          <div class="apc-country-control-group">
+            <label for="apc-country-continent">Continent</label>
+            <select id="apc-country-continent">
+              <option value="">All continents</option>
+              <option value="Africa">Africa</option>
+              <option value="Asia">Asia</option>
+              <option value="Europe">Europe</option>
+              <option value="North America">North America</option>
+              <option value="South America">South America</option>
+              <option value="Oceania">Oceania</option>
+            </select>
           </div>
-          <div id="chart-apc-distribution"></div>
+          <div class="apc-country-control-group">
+            <label for="apc-currency">Currency</label>
+            <select id="apc-currency">
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
         </div>
+        <div class="chart-content" id="chart-apc-distribution"></div>
       </div>
-      <div class="chart-row single">
-        <div class="chart-box map-box map-shell" id="chart-country-map-shell">
-          <button id="map-fullscreen-btn" class="map-fullscreen-btn" type="button">Full page map</button>
-          <div id="map-continent-legend" class="map-continent-legend"></div>
-          <div id="chart-country-map" class="map-plot"></div>
+    </div>
+    <div class="chart-row single">
+      <div class="chart-box map-box map-shell" id="chart-country-map-shell">
+        <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0zm9-9v3m0 12v3m9-9h-3M6 12H3m12.5-5.5L12 9m0 0-3.5-2.5M12 9v6"/></svg></span>Country of Publishers</div>
+        <button id="map-fullscreen-btn" class="map-fullscreen-btn" type="button">Full page map</button>
+        <div id="map-continent-legend" class="map-continent-legend"></div>
+        <div id="chart-country-map" class="map-plot"></div>
           <div class="map-fullscreen-footer">&copy; Ikhwan Arief, Universitas Andalas - CC BY-NC-SA - Data source DOAJ</div>
         </div>
       </div>
