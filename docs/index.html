@@ -125,10 +125,6 @@
       font-weight: 700;
       letter-spacing: 0.02em;
     }
-    .subject-cloud { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
-    .subject-cloud-title { font-weight: 700; font-size: 13px; color: var(--muted); letter-spacing: 0.02em; }
-    .subject-cloud-items { display: flex; flex-wrap: wrap; gap: 6px; }
-    .subject-tag { padding: 4px 9px; border-radius: 999px; font-weight: 700; background: rgba(40, 38, 36, 0.04); }
     .subject-empty { color: var(--muted); font-size: 13px; }
     .country-subject { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
     .country-subject-title { font-weight: 700; font-size: 13px; color: var(--muted); letter-spacing: 0.02em; }
@@ -509,10 +505,6 @@
       </div>
       <button id="reset">Reset Filters</button>
 
-      <div class="subject-cloud" id="subject-cloud">
-        <div class="subject-cloud-title">Top 20 subjects</div>
-        <div class="subject-cloud-items" id="subject-cloud-items"></div>
-      </div>
       <div class="country-subject" id="country-subject">
         <div class="country-subject-title">Top subjects by country (top 20)</div>
         <div class="country-subject-list" id="country-subject-list"></div>
@@ -2057,35 +2049,7 @@
       const metaText = `Source last updated: ${formatDate(state.meta.source_last_updated_max)}`;
       document.getElementById('meta-info').textContent = metaText;
       renderFxSourceNote();
-      renderSubjectCloud();
       renderCountryTopSubjects();
-    }
-
-    function renderSubjectCloud() {
-      const cloud = document.getElementById('subject-cloud-items');
-      if (!cloud) return;
-      const subjectCounts = countTermFrequency(state.records, r => toValueList(r.subject_terms));
-      const topSubjects = sortedEntries(subjectCounts, 20);
-      cloud.innerHTML = '';
-      if (!topSubjects.length) {
-        cloud.innerHTML = '<div class="subject-empty">No subject data</div>';
-        return;
-      }
-
-      const max = topSubjects[0][1] || 1;
-      const min = topSubjects[topSubjects.length - 1][1] || 0;
-      const spread = Math.max(1, max - min);
-      const palette = ['#982E0A', '#FD5A3B', '#47A178', '#3A5959', '#A3C386', '#F9D950', '#5C5956'];
-      topSubjects.forEach(([name, count], idx) => {
-        const tag = document.createElement('span');
-        tag.className = 'subject-tag';
-        const weight = (count - min) / spread; // 0..1
-        const size = 12 + Math.round(weight * 14); // 12–26px
-        tag.style.fontSize = `${size}px`;
-        tag.style.color = palette[idx % palette.length];
-        tag.textContent = `${name} (${formatNumber(count)})`;
-        cloud.appendChild(tag);
-      });
     }
 
     function renderCountryTopSubjects() {
