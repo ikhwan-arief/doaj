@@ -130,6 +130,12 @@
     .subject-cloud-items { display: flex; flex-wrap: wrap; gap: 6px; }
     .subject-tag { padding: 4px 9px; border-radius: 999px; font-weight: 700; background: rgba(40, 38, 36, 0.04); }
     .subject-empty { color: var(--muted); font-size: 13px; }
+    .country-subject { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+    .country-subject-title { font-weight: 700; font-size: 13px; color: var(--muted); letter-spacing: 0.02em; }
+    .country-subject-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+    .country-subject-item { display: flex; justify-content: space-between; align-items: center; background: rgba(40, 38, 36, 0.03); border-radius: 10px; padding: 6px 9px; font-weight: 600; }
+    .country-subject-name { color: var(--text); }
+    .country-subject-pill { padding: 3px 8px; border-radius: 999px; background: rgba(253, 90, 59, 0.14); color: #982E0A; font-size: 12px; font-weight: 700; }
     .charts { display: grid; gap: 14px; padding: 0 28px; }
     .chart-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .chart-row.single { grid-template-columns: 1fr; }
@@ -506,6 +512,10 @@
       <div class="subject-cloud" id="subject-cloud">
         <div class="subject-cloud-title">Top 20 subjects</div>
         <div class="subject-cloud-items" id="subject-cloud-items"></div>
+      </div>
+      <div class="country-subject" id="country-subject">
+        <div class="country-subject-title">Top subjects by country (top 20)</div>
+        <div class="country-subject-list" id="country-subject-list"></div>
       </div>
     </div>
 
@@ -2048,6 +2058,7 @@
       document.getElementById('meta-info').textContent = metaText;
       renderFxSourceNote();
       renderSubjectCloud();
+      renderCountryTopSubjects();
     }
 
     function renderSubjectCloud() {
@@ -2074,6 +2085,61 @@
         tag.style.color = palette[idx % palette.length];
         tag.textContent = `${name} (${formatNumber(count)})`;
         cloud.appendChild(tag);
+      });
+    }
+
+    function renderCountryTopSubjects() {
+      const host = document.getElementById('country-subject-list');
+      if (!host) return;
+      host.innerHTML = '';
+
+      // Build counts per country -> subject -> count
+      const counts = new Map();
+      for (const record of state.records) {
+        if (!record.country) continue;
+        const country = formatCountry(record.country);
+        const subjects = toValueList(record.subject_terms);
+        for (const subject of subjects) {
+          if (!subject) continue;
+          if (!counts.has(country)) counts.set(country, new Map());
+          const cMap = counts.get(country);
+          cMap.set(subject, (cMap.get(subject) || 0) + 1);
+        }
+      }
+
+      const topPerCountry = [];
+      for (const [country, subjMap] of counts.entries()) {
+        if (!subjMap.size) continue;
+        const entries = Array.from(subjMap.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+        const [subject, count] = entries[0];
+        topPerCountry.push({ country, subject, count });
+      }
+
+      topPerCountry.sort((a, b) => b.count - a.count || a.country.localeCompare(b.country));
+      const top20 = topPerCountry.slice(0, 20);
+
+      if (!top20.length) {
+        host.innerHTML = '<div class=\"subject-empty\">No country/subject data</div>';
+        return;
+      }
+
+      const palette = ['#982E0A', '#FD5A3B', '#47A178', '#3A5959', '#A3C386', '#F9D950', '#5C5956'];
+      top20.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'country-subject-item';
+        const nameEl = document.createElement('span');
+        nameEl.className = 'country-subject-name';
+        nameEl.textContent = item.country;
+
+        const pill = document.createElement('span');
+        pill.className = 'country-subject-pill';
+        pill.style.backgroundColor = palette[idx % palette.length] + '26';
+        pill.style.color = palette[idx % palette.length];
+        pill.textContent = `${item.subject} (${formatNumber(item.count)})`;
+
+        row.appendChild(nameEl);
+        row.appendChild(pill);
+        host.appendChild(row);
       });
     }
 
