@@ -16,6 +16,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600;700&family=Source+Sans+Pro:wght@400;600;700&family=Source+Code+Pro:wght@500&display=swap" rel="stylesheet">
   <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     :root {
       --bg: #F6F4F4;           /* light-grey */
@@ -1981,12 +1982,61 @@
       }
     }
 
+    async function loadSjrDataset() {
+      const cacheBust = Date.now();
+      // Try JSON first
+      const sjrJson = await loadJsonOrNull(`data/sjr.json?v=${cacheBust}`);
+      if (Array.isArray(sjrJson) && sjrJson.length) return sjrJson;
+      // Fallback to CSV if JSON not available
+      try {
+        const res = await fetch(`data/scimagojr.csv?v=${cacheBust}`, { cache: 'no-store' });
+        if (!res.ok) return [];
+        const text = await res.text();
+        if (!window.Papa) return [];
+        const parsed = Papa.parse(text, { header: true, delimiter: ';', skipEmptyLines: true });
+        if (!parsed.data || !parsed.data.length) return [];
+        return parsed.data.map(row => normalizeSjrRow(row)).filter(Boolean);
+      } catch (_err) {
+        return [];
+      }
+    }
+
+    function normalizeSjrRow(row) {
+      if (!row) return null;
+      const toNum = val => {
+        const num = Number(String(val).replace(',', '.'));
+        return Number.isFinite(num) ? num : null;
+      };
+      const issnsRaw = row.Issn || row.ISSN || '';
+      const issns = String(issnsRaw)
+        .replace(/\"/g, '')
+        .split(',')
+        .map(normalizeIssn)
+        .filter(Boolean);
+      const areasRaw = row.Areas || '';
+      const areas = String(areasRaw)
+        .split(';')
+        .map(s => s.trim())
+        .filter(Boolean);
+      return {
+        id: String(row.Sourceid || row.sourceid || '').trim(),
+        title: String(row.Title || row.title || '').trim(),
+        issns,
+        sjr: toNum(row.SJR),
+        quartile: String(row['SJR Best Quartile'] || row.quartile || '').trim(),
+        h_index: toNum(row['H index']),
+        cites3y: toNum(row['Total Citations (3years)']),
+        cites_per_doc2: toNum(row['Citations / Doc. (2years)']),
+        country: String(row.Country || '').trim(),
+        areas
+      };
+    }
+
     async function loadData() {
-      const [journalsRes, aggRes, metaRes, sjrRes] = await Promise.all([
+      const [journalsRes, aggRes, metaRes] = await Promise.all([
         loadJsonOrNull('data/journals.json'),
         loadJsonOrNull('data/aggregates.json'),
-        loadJsonOrNull('data/meta.json'),
-        loadJsonOrNull('data/sjr.json')
+        loadJsonOrNull('data/meta.json')
       ]);
 
       if (!Array.isArray(journalsRes) || journalsRes.length === 0) {
@@ -2004,7 +2054,7 @@
       state.filtered = journalsRes;
       state.aggregates = aggRes || {};
       state.meta = metaRes || {};
-      state.sjr = Array.isArray(sjrRes) ? sjrRes : [];
+      state.sjr = await loadSjrDataset();
       state.overlap = computeOverlap(state.records, state.sjr);
       state.overlapStats = computeOverlapStats(state.overlap);
       state.chartScale = computeChartScales(state.records);
