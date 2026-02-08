@@ -16,7 +16,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600;700&family=Source+Sans+Pro:wght@400;600;700&family=Source+Code+Pro:wght@500&display=swap" rel="stylesheet">
   <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     :root {
       --bg: #F6F4F4;           /* light-grey */
@@ -133,13 +132,6 @@
     .country-subject-item { display: flex; justify-content: space-between; align-items: center; background: rgba(40, 38, 36, 0.03); border-radius: 10px; padding: 6px 9px; font-weight: 600; }
     .country-subject-name { color: var(--text); }
     .country-subject-pill { padding: 3px 8px; border-radius: 999px; background: rgba(253, 90, 59, 0.14); color: #982E0A; font-size: 12px; font-weight: 700; }
-    .overlap-box { margin: 18px 28px 30px; }
-    .overlap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-    .overlap-card { background: rgba(40, 38, 36, 0.03); border-radius: 10px; padding: 10px 12px; border: 1px solid var(--border); }
-    .overlap-card h4 { margin: 0 0 6px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-    .overlap-metric { font-size: 22px; font-weight: 800; }
-    .overlap-list { margin: 0; padding-left: 16px; font-size: 13px; }
-    .overlap-list li { margin-bottom: 2px; }
     .charts { display: grid; gap: 14px; padding: 0 28px; }
     .chart-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .chart-row.single { grid-template-columns: 1fr; }
@@ -672,41 +664,6 @@
     </div>
   </div>
 
-  <div class="table-box overlap-box" id="overlap-box">
-    <h3 style="margin:0 0 10px;">DOAJ–SJR overlap</h3>
-    <div id="overlap-status" class="muted" style="margin-bottom:8px;"></div>
-    <div class="overlap-grid">
-      <div class="overlap-card">
-        <h4>Overlap count</h4>
-        <div class="overlap-metric" id="ov-count">–</div>
-      </div>
-      <div class="overlap-card">
-        <h4>SJR best quartile</h4>
-        <ul class="overlap-list" id="ov-quartiles"></ul>
-      </div>
-      <div class="overlap-card">
-        <h4>Avg citations / doc by quartile</h4>
-        <ul class="overlap-list" id="ov-cites"></ul>
-      </div>
-      <div class="overlap-card">
-        <h4>H-index (p10/median/p90)</h4>
-        <div class="overlap-metric" id="ov-hindex">–</div>
-      </div>
-      <div class="overlap-card">
-        <h4>SJR score (min/median/p90)</h4>
-        <div class="overlap-metric" id="ov-sjr">–</div>
-      </div>
-      <div class="overlap-card">
-        <h4>Top countries</h4>
-        <ul class="overlap-list" id="ov-countries"></ul>
-      </div>
-      <div class="overlap-card">
-        <h4>Top SJR areas</h4>
-        <ul class="overlap-list" id="ov-areas"></ul>
-      </div>
-    </div>
-  </div>
-
   <footer class="site-footer">
     <div class="footer-row">
       <div>&copy; Ikhwan Arief, Universitas Andalas. <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-NC-SA</a>. Data source: <a href="https://doaj.org/docs/public-data-dump/" target="_blank" rel="noopener noreferrer">DOAJ</a></div>
@@ -729,10 +686,7 @@
       yearBounds: null,
       tablePage: 1,
       tablePageSize: 50,
-      searchTerms: [],
-      sjr: [],
-      overlap: [],
-      overlapStats: null
+      searchTerms: []
     };
     const NOT_AVAILABLE = 'Not available';
     const FX_ENDPOINTS = [
@@ -1424,125 +1378,6 @@
       return sum / count;
     }
 
-    function quantile(values, q) {
-      if (!Array.isArray(values) || !values.length) return 0;
-      const sorted = values
-        .map(v => Number(v))
-        .filter(v => Number.isFinite(v))
-        .sort((a, b) => a - b);
-      if (!sorted.length) return 0;
-      const pos = (sorted.length - 1) * q;
-      const base = Math.floor(pos);
-      const rest = pos - base;
-      const next = sorted[Math.min(base + 1, sorted.length - 1)];
-      return sorted[base] + (next - sorted[base]) * rest;
-    }
-
-    function normalizeIssn(value) {
-      if (!value) return '';
-      const cleaned = String(value).toUpperCase().replace(/[^0-9X]/g, '');
-      if (cleaned.length === 8) return cleaned.slice(0, 4) + '-' + cleaned.slice(4);
-      if (cleaned.length === 9 && cleaned[4] === '-') return cleaned;
-      return '';
-    }
-
-    function getIssnSet(record) {
-      const issns = [];
-      [record.pissn, record.eissn].forEach(val => {
-        if (!val) return;
-        String(val).split(/[,;|]/).forEach(part => {
-          const norm = normalizeIssn(part);
-          if (norm) issns.push(norm);
-        });
-      });
-      const seen = new Set();
-      return issns.filter(x => !seen.has(x) && seen.add(x));
-    }
-
-    function computeOverlap(doajRecords, sjrRecords) {
-      if (!Array.isArray(doajRecords) || !Array.isArray(sjrRecords)) return [];
-      const sjrByIssn = new Map();
-      for (const rec of sjrRecords) {
-        if (!rec || !Array.isArray(rec.issns)) continue;
-        for (const issn of rec.issns) {
-          const norm = normalizeIssn(issn);
-          if (!norm) continue;
-          if (!sjrByIssn.has(norm)) sjrByIssn.set(norm, []);
-          sjrByIssn.get(norm).push(rec);
-        }
-      }
-      const overlap = [];
-      for (const rec of doajRecords) {
-        const issnSet = getIssnSet(rec);
-        let sjrMatches = [];
-        for (const issn of issnSet) {
-          if (sjrByIssn.has(issn)) {
-            sjrMatches = sjrByIssn.get(issn);
-            break;
-          }
-        }
-        if (!sjrMatches.length) continue;
-        const s = sjrMatches[0];
-        overlap.push({
-          title: rec.title || s.title,
-          doajCountry: formatCountry(rec.country),
-          sjrCountry: formatCountry(s.country),
-          quartile: s.quartile || NOT_AVAILABLE,
-          sjr: Number(s.sjr) || 0,
-          hIndex: Number(s.h_index) || 0,
-          citesPerDoc: Number(s.cites_per_doc2) || 0,
-          cites3y: Number(s.cites3y) || 0,
-          areas: Array.isArray(s.areas) ? s.areas : [],
-          issns: issnSet.length ? issnSet : (s.issns || [])
-        });
-      }
-      return overlap;
-    }
-
-    function computeOverlapStats(overlap) {
-      if (!Array.isArray(overlap) || !overlap.length) return null;
-      const stats = {};
-      stats.count = overlap.length;
-      const quartiles = {};
-      const citesByQuartile = {};
-      const hValues = [];
-      const sjrValues = [];
-      const countryCounts = {};
-      const areaCounts = {};
-
-      overlap.forEach(item => {
-        const q = item.quartile || NOT_AVAILABLE;
-        quartiles[q] = (quartiles[q] || 0) + 1;
-        if (!citesByQuartile[q]) citesByQuartile[q] = [];
-        if (item.citesPerDoc) citesByQuartile[q].push(item.citesPerDoc);
-        if (item.hIndex) hValues.push(item.hIndex);
-        if (item.sjr) sjrValues.push(item.sjr);
-        if (item.sjrCountry) {
-          countryCounts[item.sjrCountry] = (countryCounts[item.sjrCountry] || 0) + 1;
-        }
-        (item.areas || []).forEach(area => {
-          if (!area) return;
-          areaCounts[area] = (areaCounts[area] || 0) + 1;
-        });
-      });
-
-      stats.quartiles = quartiles;
-      stats.avgCitesByQuartile = Object.fromEntries(Object.entries(citesByQuartile).map(([k, arr]) => [k, computeAverage(arr) || 0]));
-      stats.hIndex = {
-        p10: quantile(hValues, 0.10),
-        median: quantile(hValues, 0.50),
-        p90: quantile(hValues, 0.90)
-      };
-      stats.sjr = {
-        min: sjrValues.length ? Math.min(...sjrValues) : 0,
-        median: quantile(sjrValues, 0.50),
-        p90: quantile(sjrValues, 0.90)
-      };
-      const sortCounts = obj => Object.entries(obj).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-      stats.topCountries = sortCounts(countryCounts).slice(0, 10);
-      stats.topAreas = sortCounts(areaCounts).slice(0, 10);
-      return stats;
-    }
 
     function getApcCountryStats(records, currency = 'EUR') {
       const byCountry = {};
@@ -1982,56 +1817,6 @@
       }
     }
 
-    async function loadSjrDataset() {
-      const cacheBust = Date.now();
-      // Try JSON first
-      const sjrJson = await loadJsonOrNull(`data/sjr.json?v=${cacheBust}`);
-      if (Array.isArray(sjrJson) && sjrJson.length) return sjrJson;
-      // Fallback to CSV if JSON not available
-      try {
-        const res = await fetch(`data/scimagojr.csv?v=${cacheBust}`, { cache: 'no-store' });
-        if (!res.ok) return [];
-        const text = await res.text();
-        if (!window.Papa) return [];
-        const parsed = Papa.parse(text, { header: true, delimiter: ';', skipEmptyLines: true });
-        if (!parsed.data || !parsed.data.length) return [];
-        return parsed.data.map(row => normalizeSjrRow(row)).filter(Boolean);
-      } catch (_err) {
-        return [];
-      }
-    }
-
-    function normalizeSjrRow(row) {
-      if (!row) return null;
-      const toNum = val => {
-        const num = Number(String(val).replace(',', '.'));
-        return Number.isFinite(num) ? num : null;
-      };
-      const issnsRaw = row.Issn || row.ISSN || '';
-      const issns = String(issnsRaw)
-        .replace(/\"/g, '')
-        .split(',')
-        .map(normalizeIssn)
-        .filter(Boolean);
-      const areasRaw = row.Areas || '';
-      const areas = String(areasRaw)
-        .split(';')
-        .map(s => s.trim())
-        .filter(Boolean);
-      return {
-        id: String(row.Sourceid || row.sourceid || '').trim(),
-        title: String(row.Title || row.title || '').trim(),
-        issns,
-        sjr: toNum(row.SJR),
-        quartile: String(row['SJR Best Quartile'] || row.quartile || '').trim(),
-        h_index: toNum(row['H index']),
-        cites3y: toNum(row['Total Citations (3years)']),
-        cites_per_doc2: toNum(row['Citations / Doc. (2years)']),
-        country: String(row.Country || '').trim(),
-        areas
-      };
-    }
-
     async function loadData() {
       const [journalsRes, aggRes, metaRes] = await Promise.all([
         loadJsonOrNull('data/journals.json'),
@@ -2054,9 +1839,6 @@
       state.filtered = journalsRes;
       state.aggregates = aggRes || {};
       state.meta = metaRes || {};
-      state.sjr = await loadSjrDataset();
-      state.overlap = computeOverlap(state.records, state.sjr);
-      state.overlapStats = computeOverlapStats(state.overlap);
       state.chartScale = computeChartScales(state.records);
       state.tablePage = 1;
       buildSearchTerms(state.records);
@@ -2865,7 +2647,6 @@
       renderKPIs();
       renderCharts();
       renderTable();
-      renderOverlapSummary();
     }
 
     function wireEvents() {
