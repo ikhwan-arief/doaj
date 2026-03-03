@@ -2271,19 +2271,31 @@
 
       for (const name of preferredOrder) {
         if (!continentCounts || !continentCounts[name]) continue;
-        items.push({ name, color: CONTINENT_COLORS[name] || CONTINENT_COLORS.Other });
+        items.push({
+          name,
+          color: CONTINENT_COLORS[name] || CONTINENT_COLORS.Other,
+          count: Number(continentCounts[name]) || 0
+        });
       }
       if (continentCounts && continentCounts.Other) {
-        items.push({ name: 'Other', color: CONTINENT_COLORS.Other });
+        items.push({
+          name: 'Other',
+          color: CONTINENT_COLORS.Other,
+          count: Number(continentCounts.Other) || 0
+        });
       }
       if (!items.length) {
         for (const name of preferredOrder) {
-          items.push({ name, color: CONTINENT_COLORS[name] || CONTINENT_COLORS.Other });
+          items.push({
+            name,
+            color: CONTINENT_COLORS[name] || CONTINENT_COLORS.Other,
+            count: 0
+          });
         }
       }
 
       legendEl.innerHTML = `<div class="legend-title">Continents</div>${items.map(item => (
-        `<div class="legend-item"><span class="legend-dot" style="background:${item.color}"></span><span>${item.name}</span></div>`
+        `<div class="legend-item"><span class="legend-dot" style="background:${item.color}"></span><span>${item.name} (${formatNumber(item.count)})</span></div>`
       )).join('')}`;
     }
 
