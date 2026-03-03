@@ -8,8 +8,8 @@ This project builds and publishes a public dashboard that helps users discover a
 
 - summary KPIs (journals, countries, articles, languages, no APC),
 - interactive filters,
-- charts (countries, subjects, licenses, peer-review, timeline, APC insights),
-- map visualization by publisher country,
+- charts (countries, continents, subjects, licenses, peer-review, preservation, deposit policy, open publishing programs, publisher sectors, timeline, APC insights),
+- map visualization by publisher country, with continent totals shown in the legend,
 - paginated journal table with search and sorting.
 
 The dashboard is designed for GitHub Pages and uses static JSON files generated from the DOAJ CSV dump.
@@ -59,6 +59,7 @@ The dashboard is designed for GitHub Pages and uses static JSON files generated 
    - Continent selector
    - Currency selector (EUR/USD)
 4. Journal table APC column and APC chart update based on selected currency.
+5. Map legend and all charts update against the current filtered dataset.
 
 ## How to run locally
 
@@ -118,6 +119,7 @@ git clone <bundle-file-path> restored-repo
 ## Notes
 
 - This project currently uses the CSV source only (no DOAJ API key needed).
+- The `Publisher sector (inferred)` chart is heuristic and based on publisher-name pattern matching, so treat it as approximate rather than authoritative.
 - Exchange rates for APC conversion are loaded live in the browser when the page opens.
   - Primary: Frankfurter API (`https://www.frankfurter.app/`)
   - Fallback: open.er-api.com (`https://open.er-api.com/`)
