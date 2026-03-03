@@ -564,7 +564,7 @@
       </div>
       <div class="chart-row">
         <div class="chart-box">
-          <div class="box-header"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M6 5h12v14H6z"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></span>Top 8 deposit policy directories</div>
+          <div class="box-header"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M6 5h12v14H6z"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></span>Top 5 deposit policy directories</div>
           <div class="chart-content" id="chart-deposit-policy"></div>
         </div>
         <div class="chart-box">
@@ -2302,12 +2302,12 @@
       );
 
       const depositPolicyCounts = countTermFrequency(state.filtered, r => getDepositPolicyTerms(r.deposit_policy_directory));
-      const topDepositPolicies = sortedEntries(depositPolicyCounts, 8);
+      const topDepositPolicies = sortedEntries(depositPolicyCounts, 5);
       const depositPolicyPalette = ['#FD5A3B', '#FA9A87', '#A3C386', '#47A178', '#3A5959', '#B5ACA4', '#D9896B', '#8EA96F'];
       const depositPolicyColors = topDepositPolicies.map((_, idx) => depositPolicyPalette[idx % depositPolicyPalette.length]);
       renderHorizontalBarChart(
         'chart-deposit-policy',
-        'Top 8 deposit policy directories',
+        'Top 5 deposit policy directories',
         topDepositPolicies.map(([label, count]) => [shortLabel(label, 60), count]),
         { leftMargin: 320, colors: depositPolicyColors, fixedMax: state.chartScale.depositPolicyMax }
       );
@@ -2478,7 +2478,7 @@
         ['chart-peer-review', 'Top 5 peer-review type'],
         ['chart-pid', 'Top 5 Persistent Identifiers'],
         ['chart-preservation', 'Top 5 Preservation Services'],
-        ['chart-deposit-policy', 'Top 8 deposit policy directories'],
+        ['chart-deposit-policy', 'Top 5 deposit policy directories'],
         ['chart-open-programs', 'Open publishing programs'],
         ['chart-publishers', 'Top 10 publishers'],
         ['chart-timeline', 'Timeline of journals added to DOAJ (monthly)']
