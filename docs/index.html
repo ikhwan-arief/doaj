@@ -435,6 +435,8 @@
     <div class="card"><div class="label"><span class="icon-chip success"><svg viewBox="0 0 24 24"><path d="M6 4h9l3 3v13H6z"/><path d="M9 11h6M9 15h6M9 7h3"/></svg></span>Articles</div><div class="value" id="kpi-articles">–</div></div>
     <div class="card"><div class="label"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 8h14M5 12h10M5 16h6"/><path d="M15 5.5 17 7M13 18l2 1.5"/></svg></span>Languages</div><div class="value" id="kpi-languages">–</div></div>
     <div class="card"><div class="label"><span class="icon-chip muted"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M8 12h5m2 0 2-2"/><path d="M5 5l14 14"/></svg></span>No APC</div><div class="value" id="kpi-no-apc">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M12 4l8 8-8 8"/><path d="M8 7h5"/></svg></span>Subscribe to Open</div><div class="value" id="kpi-subscribe-to-open">–</div></div>
+    <div class="card"><div class="label"><span class="icon-chip success"><svg viewBox="0 0 24 24"><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h6"/><path d="M5 5h14v14H5z"/></svg></span>Open Journals Collective</div><div class="value" id="kpi-open-journals-collective">–</div></div>
   </div>
 
   <div class="layout">
@@ -2040,12 +2042,16 @@
       const countries = new Set(state.filtered.map(r => r.country).filter(Boolean));
       const languages = new Set(state.filtered.flatMap(r => getSimpleTerms(r.language)));
       const noApc = state.filtered.filter(r => r.apc_has === false).length;
+      const subscribeToOpen = state.filtered.filter(r => r.subscribe_to_open === true).length;
+      const openJournalsCollective = state.filtered.filter(r => r.open_journals_collective === true).length;
 
       document.getElementById('kpi-journals').textContent = formatNumber(state.filtered.length);
       document.getElementById('kpi-countries').textContent = formatNumber(countries.size);
       document.getElementById('kpi-articles').textContent = formatNumber(sumArticleRecords(state.filtered));
       document.getElementById('kpi-languages').textContent = formatNumber(languages.size);
       document.getElementById('kpi-no-apc').textContent = formatNumber(noApc);
+      document.getElementById('kpi-subscribe-to-open').textContent = formatNumber(subscribeToOpen);
+      document.getElementById('kpi-open-journals-collective').textContent = formatNumber(openJournalsCollective);
 
       const metaText = `Source last updated: ${formatDate(state.meta.source_last_updated_max)}`;
       document.getElementById('meta-info').textContent = metaText;

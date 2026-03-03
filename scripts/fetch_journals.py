@@ -600,6 +600,7 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
             ["lastupdated", "updatedon", "mostrecentupdate", "dateupdated"],
         )
     )
+    last_full_review_date = parse_date(get_value(row, lookup, ["lastfullreviewdate", "fullreviewdate"]))
 
     issn_print = get_value(row, lookup, ["printissn", "pissn", "issnprint"])
     issn_online = get_value(row, lookup, ["onlineissn", "eissn", "issnonline"])
@@ -623,6 +624,9 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
         "apc_max_price": apc_price,
         "apc_max_currency": apc_currency,
         "waiver_has": parse_bool(get_value(row, lookup, ["waiver", "waiverpolicy", "waiveravailable"])),
+        "subscribe_to_open": parse_bool(get_value(row, lookup, ["subscribetoopen"])),
+        "mirror_journal": parse_bool(get_value(row, lookup, ["mirrorjournal"])),
+        "open_journals_collective": parse_bool(get_value(row, lookup, ["openjournalscollective"])),
         "license_type": license_type,
         "license_url": license_url,
         "license_BY": license_flags["BY"],
@@ -643,7 +647,8 @@ def normalize_row(row: Dict[str, str], lookup: Dict[str, str], index: int) -> Di
         "oa_start": get_value(row, lookup, ["oastart", "openaccessstart"]),
         "created_date": created_date,
         "last_updated": last_updated,
-        "last_manual_update": None,
+        "last_full_review_date": last_full_review_date,
+        "last_manual_update": last_full_review_date,
         "in_doaj": True,
     }
 
@@ -661,6 +666,17 @@ def aggregate(records: List[Dict[str, Any]]) -> Dict[str, Any]:
             license_type[str(values)] += 1
     apc = Counter("yes" if r.get("apc_has") else "no" for r in records if r.get("apc_has") is not None)
     waiver = Counter("yes" if r.get("waiver_has") else "no" for r in records if r.get("waiver_has") is not None)
+    subscribe_to_open = Counter(
+        "yes" if r.get("subscribe_to_open") else "no" for r in records if r.get("subscribe_to_open") is not None
+    )
+    mirror_journal = Counter(
+        "yes" if r.get("mirror_journal") else "no" for r in records if r.get("mirror_journal") is not None
+    )
+    open_journals_collective = Counter(
+        "yes" if r.get("open_journals_collective") else "no"
+        for r in records
+        if r.get("open_journals_collective") is not None
+    )
     preservation = Counter("yes" if r.get("preservation_has") else "no" for r in records if r.get("preservation_has") is not None)
     pid = Counter("yes" if r.get("pid_has") else "no" for r in records if r.get("pid_has") is not None)
     author_retains = Counter("yes" if r.get("author_retains") else "no" for r in records if r.get("author_retains") is not None)
@@ -682,16 +698,29 @@ def aggregate(records: List[Dict[str, Any]]) -> Dict[str, Any]:
         created_year[year] += 1
 
     last_updated_max = None
+    last_full_review_max = None
     for record in records:
         updated = record.get("last_updated")
         if not updated:
-            continue
-        try:
-            parsed = datetime.fromisoformat(updated.replace("Z", "+00:00"))
-        except ValueError:
-            continue
-        if last_updated_max is None or parsed > last_updated_max:
+            parsed = None
+        else:
+            try:
+                parsed = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+            except ValueError:
+                parsed = None
+        if parsed and (last_updated_max is None or parsed > last_updated_max):
             last_updated_max = parsed
+
+        full_review = record.get("last_full_review_date")
+        if not full_review:
+            review_parsed = None
+        else:
+            try:
+                review_parsed = datetime.fromisoformat(full_review.replace("Z", "+00:00"))
+            except ValueError:
+                review_parsed = None
+        if review_parsed and (last_full_review_max is None or review_parsed > last_full_review_max):
+            last_full_review_max = review_parsed
 
     return {
         "total_journals": len(records),
@@ -699,12 +728,16 @@ def aggregate(records: List[Dict[str, Any]]) -> Dict[str, Any]:
         "by_license_type": dict(license_type),
         "apc": dict(apc),
         "waiver": dict(waiver),
+        "subscribe_to_open": dict(subscribe_to_open),
+        "mirror_journal": dict(mirror_journal),
+        "open_journals_collective": dict(open_journals_collective),
         "preservation": dict(preservation),
         "pid": dict(pid),
         "author_retains": dict(author_retains),
         "subjects_top": subjects.most_common(100),
         "created_year": dict(created_year),
         "last_updated_max": last_updated_max.isoformat() if last_updated_max else None,
+        "last_full_review_max": last_full_review_max.isoformat() if last_full_review_max else None,
     }
 
 
