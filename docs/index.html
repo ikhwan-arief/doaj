@@ -583,6 +583,12 @@
         </div>
       </div>
       <div class="chart-row single">
+        <div class="chart-box">
+          <div class="box-header"><span class="icon-chip"><svg viewBox="0 0 24 24"><path d="M5 18h14"/><path d="M8 14V8"/><path d="M12 14V6"/><path d="M16 14v-4"/></svg></span>Publisher sector (inferred)</div>
+          <div class="chart-content" id="chart-publisher-sector"></div>
+        </div>
+      </div>
+      <div class="chart-row single">
         <div class="chart-box apc-country-box">
           <div class="box-header"><span class="icon-chip accent"><svg viewBox="0 0 24 24"><path d="M5 19h14"/><path d="M8 16v-5M12 19V8M16 19v-7"/><path d="M11 5h4M13 3v4"/></svg></span>Top 20 countries by APC amount</div>
           <div class="apc-country-control">
@@ -1157,6 +1163,125 @@
       return [...new Set(terms)];
     }
 
+    function getPublisherSector(value) {
+      const cleaned = String(value || '').replace(/\s+/g, ' ').trim();
+      if (!cleaned) return 'Other / Unclear';
+
+      const normalized = normalizeForMatch(cleaned);
+
+      const knownCommercial = [
+        /\belsevier\b/,
+        /\bwiley\b/,
+        /\bmdpi\b/,
+        /\bbmc\b/,
+        /\btaylor\b.*\bfrancis\b/,
+        /\bfrontiers\b/,
+        /\bsage\b/,
+        /\bsciendo\b/,
+        /\bspringer(?:open)?\b/,
+        /\bde gruyter\b/,
+        /\bemerald\b/,
+        /\bwolters kluwer\b/,
+        /\bnature portfolio\b/,
+        /\bdove medical press\b/,
+        /\bkeai\b/,
+        /\binderscience\b/,
+        /\bhindawi\b/
+      ];
+      if (knownCommercial.some(re => re.test(normalized))) return 'Commercial / Private Publisher';
+
+      const militaryPatterns = [
+        /\bmilitary\b/,
+        /\barmy\b/,
+        /\bnavy\b/,
+        /\bair force\b/,
+        /\bdefen[cs]e\b/,
+        /\barmed forces\b/,
+        /\bcivil defence\b/
+      ];
+      if (militaryPatterns.some(re => re.test(normalized))) return 'Military / Defense';
+
+      const governmentPatterns = [
+        /\bministry\b/,
+        /\bgovernment\b/,
+        /\bmunicipal\b/,
+        /\bprovince\b/,
+        /\bprovincial\b/,
+        /\bagency\b/,
+        /\bauthority\b/,
+        /\bsecretariat\b/,
+        /\bparliament\b/,
+        /\bsenate\b/,
+        /\bpublic health service\b/,
+        /\bcommission\b/,
+        /\bbureau\b/
+      ];
+      if (governmentPatterns.some(re => re.test(normalized))) return 'Government / Public';
+
+      const academicPatterns = [
+        /\buniversity\b/,
+        /\buniversidad\b/,
+        /\buniversidade\b/,
+        /\buniversitas\b/,
+        /\buniversite\b/,
+        /\buniversiti\b/,
+        /\buniversita\b/,
+        /\binstitute\b/,
+        /\binstituto\b/,
+        /\binstitut\b/,
+        /\bcollege\b/,
+        /\bfaculty\b/,
+        /\bschool\b/,
+        /\bdepartment\b/,
+        /\bpolytechnic\b/,
+        /\bpoliteknik\b/,
+        /\bteknologi\b/,
+        /\btechnology\b/,
+        /\btechnological\b/,
+        /\bhochschule\b/,
+        /\bacademia\b/,
+        /\bcampus\b/,
+        /\buniversity press\b/
+      ];
+      if (academicPatterns.some(re => re.test(normalized))) return 'Academic / University';
+
+      const societyPatterns = [
+        /\bsociety\b/,
+        /\bassociation\b/,
+        /\bfoundation\b/,
+        /\bfederation\b/,
+        /\bconsortium\b/,
+        /\bnetwork\b/,
+        /\bunion\b/,
+        /\bnonprofit\b/,
+        /\bnon profit\b/
+      ];
+      if (societyPatterns.some(re => re.test(normalized))) return 'Society / Association';
+
+      const commercialPatterns = [
+        /\bpublishing\b/,
+        /\bpublisher\b/,
+        /\bpublishers\b/,
+        /\bmedia\b/,
+        /\bcommunications\b/,
+        /\bpress\b/,
+        /\bgroup\b/,
+        /\bcompany\b/,
+        /\bcorporation\b/,
+        /\bcorp\b/,
+        /\binc\b/,
+        /\bllc\b/,
+        /\bltd\b/,
+        /\blimited\b/,
+        /\bgmbh\b/,
+        /\bco\b.*\bltd\b/,
+        /\bag\b/
+      ];
+      if (commercialPatterns.some(re => re.test(normalized))) return 'Commercial / Private Publisher';
+
+      return 'Other / Unclear';
+    }
+
     function titleCase(value) {
       return String(value)
         .toLowerCase()
@@ -1498,6 +1623,7 @@
         'Subscribe to Open': records.filter(r => r.subscribe_to_open === true).length,
         'Mirror Journal': records.filter(r => r.mirror_journal === true).length
       };
+      const publisherSectorCounts = countTermFrequency(records, r => [getPublisherSector(r.publisher)]);
       const timelineSeries = buildMonthlyTimeline(records);
       const apcCountryStats = getApcCountryStats(records);
       const apcCountryMedianMax = apcCountryStats.length ? Math.max(...apcCountryStats.map(entry => entry.median)) : 0;
@@ -1513,6 +1639,7 @@
       scales.depositPolicyMax = maxCounterValue(depositPolicyCounts);
       scales.openProgramMax = maxCounterValue(openProgramCounts);
       scales.publisherMax = maxCounterValue(publisherCounts);
+      scales.publisherSectorMax = maxCounterValue(publisherSectorCounts);
       scales.timelineMax = Math.max(...timelineSeries.counts, ...timelineSeries.movingAvg, 0);
       scales.apcCountryMedianMax = apcCountryMedianMax;
       scales.mapCountryMax = scales.countryMax;
@@ -2346,6 +2473,27 @@
         fixedMax: state.chartScale.publisherMax
       });
 
+      const publisherSectorCounts = countTermFrequency(state.filtered, r => [getPublisherSector(r.publisher)]);
+      const topPublisherSectors = sortedEntries(publisherSectorCounts);
+      const publisherSectorColors = {
+        'Academic / University': '#47A178',
+        'Commercial / Private Publisher': '#FD5A3B',
+        'Society / Association': '#A3C386',
+        'Government / Public': '#3A5959',
+        'Military / Defense': '#982E0A',
+        'Other / Unclear': '#B5ACA4'
+      };
+      renderHorizontalBarChart(
+        'chart-publisher-sector',
+        'Publisher sector (inferred)',
+        topPublisherSectors,
+        {
+          leftMargin: 250,
+          colors: topPublisherSectors.map(([label]) => publisherSectorColors[label] || '#3A5959'),
+          fixedMax: state.chartScale.publisherSectorMax
+        }
+      );
+
       const timelineSeries = buildMonthlyTimeline(state.filtered);
       if (!timelineSeries.dates.length) {
         renderNoDataChart('chart-timeline', 'Timeline of journals added to DOAJ (monthly)');
@@ -2481,6 +2629,7 @@
         ['chart-deposit-policy', 'Top 5 deposit policy directories'],
         ['chart-open-programs', 'Open publishing programs'],
         ['chart-publishers', 'Top 10 publishers'],
+        ['chart-publisher-sector', 'Publisher sector (inferred)'],
         ['chart-timeline', 'Timeline of journals added to DOAJ (monthly)']
       ];
       emptyCharts.forEach(([id, title]) => renderHorizontalBarChart(id, title, []));
